@@ -167,7 +167,38 @@
     .layout-toggle {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
     }
+
+    /* Generic label+control row inside panels */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .control-row label {
+      font-size: 0.85rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    .control-row input[type=number] {
+      width: 70px;
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .control-row input[type=number]:focus { border-color: #4ea8ff; }
 
     .layout-btn {
       background: #3a3a3a;
@@ -292,6 +323,17 @@
     <button class="layout-btn active" id="btn-linear"  onclick="setLayout('linear')">⏤ Linear</button>
     <button class="layout-btn"        id="btn-circular" onclick="setLayout('circular')">◎ Circular</button>
   </div>
+  <div class="control-row">
+    <label for="inp-start-angle">Start angle (°):</label>
+    <input type="number" id="inp-start-angle" value="135" min="0" max="359" step="1"
+           oninput="setStartAngle(this.value)" />
+    <span style="font-size:0.75rem;color:#666;">0° = right, 90° = bottom, 180° = left, 270° = top</span>
+  </div>
+  <div class="control-row">
+    <label>Direction:</label>
+    <button class="layout-btn active" id="btn-cw"  onclick="setDirection('cw')">↻ Clockwise</button>
+    <button class="layout-btn"        id="btn-ccw" onclick="setDirection('ccw')">↺ Counter-CW</button>
+  </div>
 </div>
 
 <!-- Canvas -->
@@ -318,9 +360,11 @@ const state = {
   zoom:     [],   // numeric mm
 };
 
-let layout    = 'linear'; // 'linear' | 'circular'
-let focusUnit = 'metric'; // 'metric' | 'feet'
-let stopType  = 'f';      // 'f' | 't'
+let layout       = 'linear'; // 'linear' | 'circular'
+let focusUnit    = 'metric'; // 'metric' | 'feet'
+let stopType     = 'f';      // 'f' | 't'
+let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
+let ringDirection = 'cw';    // 'cw' | 'ccw'
 
 /* =========================================================
    Defaults so the canvas is not empty on first load
@@ -497,6 +541,19 @@ function setLayout(mode) {
   drawAll();
 }
 
+function setStartAngle(val) {
+  const n = parseInt(val, 10);
+  startAngleDeg = isNaN(n) ? 135 : ((n % 360) + 360) % 360;
+  drawAll();
+}
+
+function setDirection(dir) {
+  ringDirection = dir;
+  document.getElementById('btn-cw').classList.toggle('active',  dir === 'cw');
+  document.getElementById('btn-ccw').classList.toggle('active', dir === 'ccw');
+  drawAll();
+}
+
 /* =========================================================
    Options: focus unit and stop type
    ========================================================= */
@@ -605,8 +662,12 @@ function drawRing(type, y, h, marks) {
     return;
   }
 
-  /* Map value → x position using a log-like scale */
-  const positions = computePositions(marks, rx, rx + rw);
+  /* Map value → x position using a log-like scale.
+     When direction is CCW, mirror the positions so the rail reads right-to-left. */
+  const rawPositions = computePositions(marks, rx, rx + rw);
+  const positions = ringDirection === 'ccw'
+    ? rawPositions.map(x => rx + rw - (x - rx))
+    : rawPositions;
 
   marks.forEach((val, i) => {
     const x = positions[i];
@@ -660,12 +721,15 @@ function drawCircularRings(types, CW, CH) {
   const innerCore = outerR * 0.22;    // empty centre
   const ringBand  = (outerR - innerCore) / (ORDER.length || 1);
 
-  // Angular sweep: 270° starting from bottom-left going clockwise,
-  // i.e. from 135° to 45° passing through top (matching lens barrel feel).
-  const START_DEG = 135;
+  // Angular sweep: 270°, driven by startAngleDeg and ringDirection.
+  // START_RAD is where the minimum value lands; the sweep goes clockwise (CW)
+  // or counter-clockwise (CCW) for 270°.
   const SWEEP_DEG = 270;
-  const START_RAD = (START_DEG * Math.PI) / 180;
+  const START_RAD = (startAngleDeg * Math.PI) / 180;
   const SWEEP_RAD = (SWEEP_DEG * Math.PI) / 180;
+  // For CCW the arc runs in the negative direction.
+  const DIR      = ringDirection === 'ccw' ? -1 : 1;
+  const END_RAD  = START_RAD + DIR * SWEEP_RAD;
 
   ORDER.forEach((type, ringIdx) => {
     const col    = COLORS[type];
@@ -698,20 +762,20 @@ function drawCircularRings(types, CW, CH) {
     const midR = (outerRing + innerRing) / 2;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, midR, START_RAD, START_RAD + SWEEP_RAD);
+    ctx.arc(cx, cy, midR, START_RAD, END_RAD, ringDirection === 'ccw');
     ctx.strokeStyle = col.ring + '66';
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
 
-    /* Gap angle (the 90° opening at the bottom of the sweep ring) */
-    const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
+    /* Gap angle — midpoint of the 90° opening left by the sweep */
+    const gapAngle = END_RAD + DIR * (2 * Math.PI - SWEEP_RAD) / 2;
     const gapCos   = Math.cos(gapAngle);
     const gapSin   = Math.sin(gapAngle);
 
     /* Marks */
     if (marks.length > 0) {
-      const angles = computeAngles(marks, START_RAD, START_RAD + SWEEP_RAD);
+      const angles = computeAngles(marks, START_RAD, END_RAD);
       const tickIn  = innerRing;
       const tickOut = outerRing;
 
