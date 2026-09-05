@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lens Ring Visualizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: #fff;
+    }
+
+    .panel {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 18px 20px;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    /* Ring mode checkboxes */
+    .modes {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .mode-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+
+    .mode-label input[type=checkbox] {
+      width: 16px; height: 16px;
+      accent-color: #4ea8ff;
+      cursor: pointer;
+    }
+
+    /* Marks list */
+    .marks-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .mark-section h3 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .mark-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .mark-row input[type=text] {
+      flex: 1;
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 5px 8px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .mark-row input[type=text]:focus { border-color: #4ea8ff; }
+
+    .mark-row input[type=text].invalid { border-color: #ff4e4e; }
+
+    .btn {
+      background: #3a3a3a;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #ccc;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #484848; border-color: #777; }
+
+    .btn.primary {
+      background: #1a4f8a;
+      border-color: #2a6bc9;
+      color: #fff;
+    }
+    .btn.primary:hover { background: #2260aa; }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-height: 26px;
+    }
+
+    .tag {
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tag .remove {
+      cursor: pointer;
+      color: #888;
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+    .tag .remove:hover { color: #ff6b6b; }
+
+    /* Canvas area */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      border-radius: 12px;
+      background: #111;
+    }
+
+    /* Layout toggle */
+    .layout-toggle {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    /* Generic label+control row inside panels */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .control-row label {
+      font-size: 0.85rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+
+    .control-row input[type=number] {
+      width: 70px;
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 4px 8px;
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .control-row input[type=number]:focus { border-color: #4ea8ff; }
+
+    .layout-btn {
+      background: #3a3a3a;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #ccc;
+      padding: 5px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .layout-btn:hover { background: #484848; border-color: #777; }
+
+    .layout-btn.active {
+      background: #1a4f8a;
+      border-color: #2a6bc9;
+      color: #fff;
+    }
+
+    /* Export */
+    .export-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Validation hint */
+    .hint {
+      font-size: 0.72rem;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 520px) {
+      .marks-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔭 Lens Ring Visualizer</h1>
+
+<!-- Ring mode selection -->
+<div class="panel">
+  <h2>Rings to Display</h2>
+  <div class="modes">
+    <label class="mode-label">
+      <input type="checkbox" id="chk-focus" checked /> Focus
+    </label>
+    <label class="mode-label">
+      <input type="checkbox" id="chk-aperture" checked /> Aperture
+    </label>
+    <label class="mode-label">
+      <input type="checkbox" id="chk-zoom" checked /> Zoom
+    </label>
+  </div>
+</div>
+
+<!-- Marks input -->
+<div class="panel">
+  <h2>Markings</h2>
+  <div class="marks-grid">
+
+    <!-- Focus -->
+    <div class="mark-section" id="sec-focus">
+      <h3 id="lbl-focus">Focus (m)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-focus" placeholder="e.g. 0.5 or 1.2" />
+        <button class="btn primary" onclick="addMark('focus')">+</button>
+      </div>
+      <p class="hint" id="hint-focus">Distance in metres</p>
+      <div class="tag-list" id="tags-focus"></div>
+    </div>
+
+    <!-- Aperture -->
+    <div class="mark-section" id="sec-aperture">
+      <h3 id="lbl-aperture">Aperture (f/)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-aperture" placeholder="e.g. 1.8 or 2.8" />
+        <button class="btn primary" onclick="addMark('aperture')">+</button>
+      </div>
+      <p class="hint" id="hint-aperture">f-number (the part after "f/")</p>
+      <div class="tag-list" id="tags-aperture"></div>
+    </div>
+
+    <!-- Zoom -->
+    <div class="mark-section" id="sec-zoom">
+      <h3>Focal Length (mm)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-zoom" placeholder="e.g. 24 or 70" />
+        <button class="btn primary" onclick="addMark('zoom')">+</button>
+      </div>
+      <p class="hint">Focal length in millimetres</p>
+      <div class="tag-list" id="tags-zoom"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Options -->
+<div class="panel">
+  <h2>Options</h2>
+  <div class="modes" style="gap: 10px 18px; align-items: center;">
+    <label class="mode-label" title="Distance unit used for focus marks">
+      Focus unit:
+    </label>
+    <button class="layout-btn active" id="btn-metric" onclick="setFocusUnit('metric')">m / cm</button>
+    <button class="layout-btn"        id="btn-feet"   onclick="setFocusUnit('feet')">ft / in</button>
+    <label class="mode-label" title="Aperture stop type" style="margin-left: 14px;">
+      Aperture:
+    </label>
+    <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
+    <button class="layout-btn"        id="btn-tstop" onclick="setStopType('t')">T-stop</button>
+  </div>
+</div>
+
+<!-- Layout toggle -->
+<div class="panel">
+  <h2>Layout</h2>
+  <div class="layout-toggle">
+    <button class="layout-btn active" id="btn-linear"  onclick="setLayout('linear')">⏤ Linear</button>
+    <button class="layout-btn"        id="btn-circular" onclick="setLayout('circular')">◎ Circular</button>
+  </div>
+  <div class="control-row">
+    <label for="inp-start-angle">Start angle (°):</label>
+    <input type="number" id="inp-start-angle" value="135" min="0" max="359" step="1"
+           oninput="setStartAngle(this.value)" />
+    <span style="font-size:0.75rem;color:#666;">0° = right, 90° = bottom, 180° = left, 270° = top</span>
+  </div>
+  <div class="control-row">
+    <label for="inp-end-angle">End angle (°):</label>
+    <input type="number" id="inp-end-angle" value="45" min="0" max="359" step="1"
+           oninput="setEndAngle(this.value)" />
+    <span id="hint-sweep" style="font-size:0.75rem;color:#666;">sweep: 270°</span>
+  </div>
+  <div class="control-row">
+    <label>Direction:</label>
+    <button class="layout-btn active" id="btn-cw"  onclick="setDirection('cw')">↻ Clockwise</button>
+    <button class="layout-btn"        id="btn-ccw" onclick="setDirection('ccw')">↺ Counter-CW</button>
+  </div>
+</div>
+
+<!-- Canvas -->
+<div class="canvas-wrap">
+  <canvas id="ringCanvas" width="1400" height="700"></canvas>
+</div>
+
+<!-- Export -->
+<div class="panel">
+  <h2>Export</h2>
+  <div class="export-row">
+    <button class="btn primary" onclick="exportCanvas('png')">⬇ Download PNG</button>
+    <button class="btn primary" onclick="exportCanvas('jpeg')">⬇ Download JPEG</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   State
+   ========================================================= */
+const state = {
+  focus:    [],   // numeric metres
+  aperture: [],   // numeric f-number
+  zoom:     [],   // numeric mm
+};
+
+let layout       = 'linear'; // 'linear' | 'circular'
+let focusUnit    = 'metric'; // 'metric' | 'feet'
+let stopType     = 'f';      // 'f' | 't'
+let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
+let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
+let ringDirection = 'cw';    // 'cw' | 'ccw'
+
+/* =========================================================
+   Defaults so the canvas is not empty on first load
+   ========================================================= */
+const DEFAULTS = {
+  focus:    [0.3, 0.5, 0.7, 1, 1.5, 2, 3, 5, 10, Infinity],
+  aperture: [1.4, 1.8, 2, 2.8, 4, 5.6, 8, 11, 16, 22],
+  zoom:     [24, 28, 35, 50, 70, 85, 100, 135, 200],
+};
+
+/* =========================================================
+   Ring display colours
+   ========================================================= */
+const COLORS = {
+  focus:    { ring: '#4ea8ff', text: '#b8d9ff', bg: '#0d2a4a' },
+  aperture: { ring: '#ff9f4e', text: '#ffd8b0', bg: '#3a2000' },
+  zoom:     { ring: '#6adf7e', text: '#c0f5c8', bg: '#0a2d12' },
+};
+
+/* =========================================================
+   Helpers
+   ========================================================= */
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Metres → feet+inches string, e.g. 0.5 → "1′7.7″", 0.3 → "11.8″"
+function metresToFeetStr(m) {
+  if (!isFinite(m)) return '∞';
+  const totalInches = m * 39.3701;
+  let feet   = Math.floor(totalInches / 12);
+  let inches = parseFloat((totalInches % 12).toFixed(1));
+  // Carry over when rounding pushes inches to 12
+  if (inches >= 12) { feet += 1; inches = 0; }
+  if (feet === 0) return `${inches}″`;
+  return `${feet}′${inches}″`;
+}
+
+function formatFocus(v) {
+  if (!isFinite(v)) return '∞';
+  if (focusUnit === 'feet') return metresToFeetStr(v);
+  return v < 1 ? `${Math.round(v * 100)}cm` : `${v}m`;
+}
+function formatAperture(v) { return stopType === 't' ? `T${v}` : `f/${v}`; }
+function formatZoom(v)     { return `${v}mm`; }
+
+const FORMATTERS = { focus: formatFocus, aperture: formatAperture, zoom: formatZoom };
+
+/* =========================================================
+   Mark management
+   ========================================================= */
+function parseValue(type, raw) {
+  const s = raw.trim();
+  if (!s) return null;
+
+  if (type === 'focus') {
+    // Accept: "inf", "∞", "infinity", or a positive number
+    if (/^(inf|infinity|∞)$/i.test(s)) return Infinity;
+    // When in feet mode, accept e.g. "3", "3.5" (feet), "3'6\"", "3'6", "42""
+    if (focusUnit === 'feet') {
+      // Format: feet+inches  e.g. 3'6" or 3'6 or just 3.5
+      const ftIn = s.match(/^(\d+(?:\.\d+)?)'(\d+(?:\.\d+)?)"?$/);
+      if (ftIn) {
+        const metres = (parseFloat(ftIn[1]) * 12 + parseFloat(ftIn[2])) / 39.3701;
+        return metres > 0 ? metres : null;
+      }
+      // Inches-only: e.g. 42"
+      const inOnly = s.match(/^(\d+(?:\.\d+)?)"$/);
+      if (inOnly) {
+        const metres = parseFloat(inOnly[1]) / 39.3701;
+        return metres > 0 ? metres : null;
+      }
+      // Plain number treated as feet
+      const ft = parseFloat(s);
+      if (isNaN(ft) || ft <= 0) return null;
+      return ft * 0.3048;
+    }
+    const n = parseFloat(s);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  if (type === 'aperture') {
+    // Accept "f/", "F/", "f", "F", "T/", "T", "t/", "t" prefixes or bare number
+    const clean = s.replace(/^[fFtT]\/?/, '');
+    const n = parseFloat(clean);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  if (type === 'zoom') {
+    // Accept: "24mm", "24"
+    const clean = s.replace(/mm$/i, '');
+    const n = parseFloat(clean);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  return null;
+}
+
+function addMark(type) {
+  const inp = document.getElementById(`inp-${type}`);
+  const val = parseValue(type, inp.value);
+  if (val === null) {
+    inp.classList.add('invalid');
+    setTimeout(() => inp.classList.remove('invalid'), 1200);
+    return;
+  }
+  if (!state[type].includes(val)) {
+    state[type].push(val);
+    state[type].sort((a, b) => a - b);
+  }
+  inp.value = '';
+  renderTags(type);
+  drawAll();
+}
+
+function removeMark(type, val) {
+  state[type] = state[type].filter(v => v !== val);
+  renderTags(type);
+  drawAll();
+}
+
+function renderTags(type) {
+  const container = document.getElementById(`tags-${type}`);
+  container.innerHTML = '';
+  state[type].forEach(v => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+
+    const label = document.createTextNode(FORMATTERS[type](v) + ' ');
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'remove';
+    removeBtn.title = 'Remove';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => removeMark(type, v));
+
+    tag.appendChild(label);
+    tag.appendChild(removeBtn);
+    container.appendChild(tag);
+  });
+}
+
+/* Allow Enter key to add */
+['focus', 'aperture', 'zoom'].forEach(type => {
+  document.getElementById(`inp-${type}`).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addMark(type);
+  });
+});
+
+/* =========================================================
+   Canvas drawing
+   ========================================================= */
+const canvas  = document.getElementById('ringCanvas');
+const ctx     = canvas.getContext('2d');
+
+function getActiveTypes() {
+  return ['focus', 'aperture', 'zoom'].filter(
+    t => document.getElementById(`chk-${t}`).checked
+  );
+}
+
+/* =========================================================
+   Layout switching
+   ========================================================= */
+function setLayout(mode) {
+  layout = mode;
+  document.getElementById('btn-linear').classList.toggle('active', mode === 'linear');
+  document.getElementById('btn-circular').classList.toggle('active', mode === 'circular');
+
+  if (mode === 'circular') {
+    canvas.width  = 900;
+    canvas.height = 900;
+  } else {
+    canvas.width  = 1400;
+    canvas.height = 700;
+  }
+  drawAll();
+}
+
+function setStartAngle(val) {
+  const n = parseInt(val, 10);
+  startAngleDeg = isNaN(n) ? 135 : ((n % 360) + 360) % 360;
+  _syncAngleInputs();
+  drawAll();
+}
+
+function setEndAngle(val) {
+  const n = parseInt(val, 10);
+  const endDeg = isNaN(n) ? ((startAngleDeg + sweepDeg) % 360) : ((n % 360) + 360) % 360;
+  // Compute sweep from start to end in the active direction
+  const DIR = ringDirection === 'ccw' ? -1 : 1;
+  let diff = ((DIR * (((endDeg - startAngleDeg) % 360) + 360) % 360) % 360 + 360) % 360;
+  if (diff < 10)  diff = 10;
+  if (diff > 350) diff = 350;
+  sweepDeg = diff;
+  _syncAngleInputs();
+  drawAll();
+}
+
+function setDirection(dir) {
+  ringDirection = dir;
+  document.getElementById('btn-cw').classList.toggle('active',  dir === 'cw');
+  document.getElementById('btn-ccw').classList.toggle('active', dir === 'ccw');
+  _syncAngleInputs();
+  drawAll();
+}
+
+function _syncAngleInputs() {
+  const DIR    = ringDirection === 'ccw' ? -1 : 1;
+  const endDeg = ((startAngleDeg + DIR * sweepDeg) % 360 + 360) % 360;
+  document.getElementById('inp-start-angle').value = startAngleDeg;
+  document.getElementById('inp-end-angle').value   = Math.round(endDeg);
+  document.getElementById('hint-sweep').textContent = `sweep: ${Math.round(sweepDeg)}°`;
+}
+
+/* =========================================================
+   Options: focus unit and stop type
+   ========================================================= */
+function setFocusUnit(unit) {
+  focusUnit = unit;
+  document.getElementById('btn-metric').classList.toggle('active', unit === 'metric');
+  document.getElementById('btn-feet').classList.toggle('active', unit === 'feet');
+
+  // Update heading and hint
+  document.getElementById('lbl-focus').textContent =
+    unit === 'feet' ? 'Focus (ft)' : 'Focus (m)';
+  document.getElementById('hint-focus').textContent =
+    unit === 'feet'
+      ? "Distance in feet — e.g. 3, 3'6\", 42\""
+      : 'Distance in metres';
+  document.getElementById('inp-focus').placeholder =
+    unit === 'feet' ? "e.g. 3 or 3'6\"" : 'e.g. 0.5 or 1.2';
+
+  renderTags('focus');
+  drawAll();
+}
+
+function setStopType(type) {
+  stopType = type;
+  document.getElementById('btn-fstop').classList.toggle('active', type === 'f');
+  document.getElementById('btn-tstop').classList.toggle('active', type === 't');
+
+  // Update heading and hint
+  const isTStop = type === 't';
+  document.getElementById('lbl-aperture').textContent =
+    isTStop ? 'Aperture (T)' : 'Aperture (f/)';
+  document.getElementById('hint-aperture').textContent =
+    isTStop ? 'T-number (e.g. T1.8 or 1.8)' : 'f-number (the part after "f/")';
+  document.getElementById('inp-aperture').placeholder =
+    isTStop ? 'e.g. T1.8 or 2.8' : 'e.g. 1.8 or 2.8';
+
+  renderTags('aperture');
+  drawAll();
+}
+
+function drawAll() {
+  const CW = canvas.width;
+  const CH = canvas.height;
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, CW, CH);
+
+  const types = getActiveTypes();
+  if (types.length === 0) return;
+
+  if (layout === 'circular') {
+    drawCircularRings(types, CW, CH);
+  } else {
+    const ringH = Math.floor(CH / types.length);
+    types.forEach((type, idx) => {
+      drawRing(type, idx * ringH, ringH, state[type]);
+    });
+  }
+}
+
+/* Draw a single ring strip (linear layout) */
+function drawRing(type, y, h, marks) {
+  const CW  = canvas.width;
+  const col = COLORS[type];
+  const pad = 60;          // horizontal padding
+  const cy  = y + h / 2;  // centre y of the strip
+  const rx  = pad;         // left x of rail
+  const rw  = CW - pad * 2; // rail width
+
+  /* Background */
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, 0, y + 8, CW, h - 16, 12);
+  ctx.fillStyle = col.bg;
+  ctx.fill();
+  ctx.restore();
+
+  /* Label */
+  ctx.save();
+  ctx.font = 'bold 18px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = col.ring;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const label = type.charAt(0).toUpperCase() + type.slice(1);
+  ctx.fillText(label, 14, cy);
+  ctx.restore();
+
+  /* Rail line */
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(rx, cy);
+  ctx.lineTo(rx + rw, cy);
+  ctx.strokeStyle = col.ring + '66';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  if (marks.length === 0) {
+    ctx.save();
+    ctx.font = '14px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = '#555';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText('No marks added yet', CW / 2, cy);
+    ctx.restore();
+    return;
+  }
+
+  /* Map value → x position using a log-like scale.
+     When direction is CCW, mirror the positions so the rail reads right-to-left. */
+  const rawPositions = computePositions(marks, rx, rx + rw);
+  const positions = ringDirection === 'ccw'
+    ? rawPositions.map(x => rx + rw - (x - rx))
+    : rawPositions;
+
+  marks.forEach((val, i) => {
+    const x = positions[i];
+    const tickH = 24;
+
+    /* Tick line */
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, cy - tickH);
+    ctx.lineTo(x, cy + tickH);
+    ctx.strokeStyle = col.ring;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    /* Dot */
+    ctx.beginPath();
+    ctx.arc(x, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = col.ring;
+    ctx.fill();
+    ctx.restore();
+
+    /* Label */
+    ctx.save();
+    ctx.font = '13px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = col.text;
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    ctx.fillText(FORMATTERS[type](val), x, cy - tickH - 3);
+    ctx.restore();
+  });
+}
+
+/* =========================================================
+   Circular layout
+   =========================================================
+   Rings are drawn as concentric annuli.
+   Ring order from outside in: focus → aperture → zoom.
+   Marks are placed as radial ticks + arc labels over a 270°
+   sweep (leaving a 90° gap at the bottom for the legend).
+   ========================================================= */
+function drawCircularRings(types, CW, CH) {
+  // Ring order (outermost first) — only include active types
+  const ORDER = ['focus', 'aperture', 'zoom'].filter(t => types.includes(t));
+
+  const cx = CW / 2;
+  const cy = CH / 2;
+
+  // Outer radius of outermost ring, inner radius of innermost.
+  // Leave 80px margin so labels around the outside always fit within the canvas.
+  const outerR    = Math.min(CW, CH) / 2 - 80;
+  const innerCore = outerR * 0.22;    // empty centre
+  const ringBand  = (outerR - innerCore) / (ORDER.length || 1);
+
+  // Angular sweep: driven by sweepDeg and ringDirection.
+  // START_RAD is where the minimum value lands; the sweep goes clockwise (CW)
+  // or counter-clockwise (CCW) for the configured number of degrees.
+  const SWEEP_DEG = sweepDeg;
+  const START_RAD = (startAngleDeg * Math.PI) / 180;
+  const SWEEP_RAD = (SWEEP_DEG * Math.PI) / 180;
+  // For CCW the arc runs in the negative direction.
+  const DIR      = ringDirection === 'ccw' ? -1 : 1;
+  const END_RAD  = START_RAD + DIR * SWEEP_RAD;
+
+  ORDER.forEach((type, ringIdx) => {
+    const col    = COLORS[type];
+    const marks  = state[type];
+    const outerRing = outerR - ringIdx * ringBand;
+    const innerRing = outerRing - ringBand + 4; // 4px gap between rings
+
+    /* Annulus background */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerRing, 0, Math.PI * 2);
+    ctx.arc(cx, cy, innerRing, 0, Math.PI * 2, true);
+    ctx.fillStyle = col.bg;
+    ctx.fill();
+    ctx.restore();
+
+    /* Annulus border */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerRing, 0, Math.PI * 2);
+    ctx.strokeStyle = col.ring + '55';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerRing, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    /* Centre-line arc (mid-radius) */
+    const midR = (outerRing + innerRing) / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, midR, START_RAD, END_RAD, ringDirection === 'ccw');
+    ctx.strokeStyle = col.ring + '66';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    /* Gap angle — midpoint of the 90° opening left by the sweep */
+    const gapAngle = END_RAD + DIR * (2 * Math.PI - SWEEP_RAD) / 2;
+    const gapCos   = Math.cos(gapAngle);
+    const gapSin   = Math.sin(gapAngle);
+
+    /* Marks */
+    if (marks.length > 0) {
+      const angles = computeAngles(marks, START_RAD, END_RAD);
+      const tickIn  = innerRing;
+      const tickOut = outerRing;
+
+      marks.forEach((val, i) => {
+        const angle = angles[i];
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        /* Tick line (radial) */
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx + cos * tickIn,  cy + sin * tickIn);
+        ctx.lineTo(cx + cos * tickOut, cy + sin * tickOut);
+        ctx.strokeStyle = col.ring;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        /* Dot on centre-line */
+        ctx.beginPath();
+        ctx.arc(cx + cos * midR, cy + sin * midR, 4, 0, Math.PI * 2);
+        ctx.fillStyle = col.ring;
+        ctx.fill();
+        ctx.restore();
+
+        /* Label — positioned outside the ring */
+        const labelR = tickOut + 14;
+        const lx = cx + cos * labelR;
+        const ly = cy + sin * labelR;
+
+        ctx.save();
+        ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = col.text;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
+        ctx.fillText(FORMATTERS[type](val), lx, ly);
+        ctx.restore();
+      });
+    } else {
+      /* "(no marks)" hint — inside the band, just below the ring label */
+      ctx.save();
+      ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#555';
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'center';
+      ctx.fillText('(no marks)', cx + gapCos * midR, cy + gapSin * midR + 10);
+      ctx.restore();
+    }
+
+    /* Ring label inside the band at the gap position */
+    ctx.save();
+    ctx.font = `bold 12px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = col.ring;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), cx + gapCos * midR, cy + gapSin * midR);
+    ctx.restore();
+  });
+
+  /* Lens barrel decoration — innermost circle */
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerCore, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  /* Centre cross-hair */
+  ctx.save();
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+  ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
+  ctx.stroke();
+  ctx.restore();
+
+  /* Drag handles — small dots on the outermost arc at start and end of sweep */
+  const HANDLE_RADIUS = 6;
+  [[START_RAD, '#4ea8ff'], [END_RAD, '#ffa040']].forEach(([angle, color]) => {
+    const hx = cx + Math.cos(angle) * outerR;
+    const hy = cy + Math.sin(angle) * outerR;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(hx, hy, HANDLE_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  /* Save layout info for drag hit-testing */
+  _circ = { cx, cy, outerR, startRad: START_RAD, endRad: END_RAD };
+}
+
+/* =========================================================
+   Shared log-scale mapping utility
+   Returns an array of t values in [0, 1] for each mark.
+   Infinity is proxied as 4× the max finite value.
+   ========================================================= */
+function logScaleT(marks) {
+  if (marks.length === 1) return [0.5];
+
+  const finite = marks.filter(isFinite);
+  const maxFin = finite.length ? Math.max(...finite) : 1;
+  const INF_PROXY = maxFin * 4;
+
+  const raw    = marks.map(v => (isFinite(v) ? v : INF_PROXY));
+  const logRaw = raw.map(v => Math.log(v + 1e-9));
+  const lo     = Math.min(...logRaw);
+  const hi     = Math.max(...logRaw);
+
+  return raw.map(v => (hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo)));
+}
+
+/* =========================================================
+   Position mapping (logarithmic scale for natural feel)
+   ========================================================= */
+function computePositions(marks, x0, x1) {
+  return logScaleT(marks).map(t => Math.round(x0 + t * (x1 - x0)));
+}
+
+/* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
+function computeAngles(marks, a0, a1) {
+  return logScaleT(marks).map(t => a0 + t * (a1 - a0));
+}
+
+/* =========================================================
+   Utility: rounded rect (polyfill for older browsers)
+   ========================================================= */
+function roundRect(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y,     x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x,     y + h, r);
+    ctx.arcTo(x,     y + h, x,     y,     r);
+    ctx.arcTo(x,     y,     x + w, y,     r);
+    ctx.closePath();
+  }
+}
+
+/* =========================================================
+   Circular drag state
+   ========================================================= */
+let _circ = null; // { cx, cy, outerR, startRad, endRad } — updated each draw
+
+let _drag = null; // { handle: 'start'|'end' }
+
+function _canvasPos(e) {
+  const rect  = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return {
+    x: (src.clientX - rect.left) * scaleX,
+    y: (src.clientY - rect.top)  * scaleY,
+  };
+}
+
+function _handleHit(pos, angle, cx, cy, r, hitR) {
+  const hx = cx + Math.cos(angle) * r;
+  const hy = cy + Math.sin(angle) * r;
+  const dx = pos.x - hx, dy = pos.y - hy;
+  return Math.sqrt(dx * dx + dy * dy) <= hitR;
+}
+
+function _onDragStart(e) {
+  if (layout !== 'circular' || !_circ) return;
+  const pos = _canvasPos(e);
+  const HIT = 20; // pixels
+  if (_handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR, HIT)) {
+    _drag = { handle: 'start' };
+    e.preventDefault();
+  } else if (_handleHit(pos, _circ.endRad, _circ.cx, _circ.cy, _circ.outerR, HIT)) {
+    _drag = { handle: 'end' };
+    e.preventDefault();
+  }
+}
+
+function _onDragMove(e) {
+  /* Update cursor when hovering over drag handles (no active drag) */
+  if (!_drag) {
+    if (layout === 'circular' && _circ) {
+      const pos = _canvasPos(e);
+      const HIT = 20;
+      const near = _handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR, HIT)
+                || _handleHit(pos, _circ.endRad,   _circ.cx, _circ.cy, _circ.outerR, HIT);
+      canvas.style.cursor = near ? 'grab' : '';
+    } else {
+      canvas.style.cursor = '';
+    }
+    return;
+  }
+
+  e.preventDefault();
+  const pos   = _canvasPos(e);
+  const angle = Math.atan2(pos.y - _circ.cy, pos.x - _circ.cx);
+  const deg   = ((angle * 180 / Math.PI) + 360) % 360;
+  const DIR   = ringDirection === 'ccw' ? -1 : 1;
+
+  if (_drag.handle === 'start') {
+    // Keep sweepDeg the same; just shift startAngleDeg
+    startAngleDeg = Math.round(deg);
+    _syncAngleInputs();
+    drawAll();
+  } else {
+    // Adjust sweep so that end stays near pointer angle
+    let diff = ((DIR * (((deg - startAngleDeg) % 360) + 360) % 360) % 360 + 360) % 360;
+    if (diff < 10)  diff = 10;
+    if (diff > 350) diff = 350;
+    sweepDeg = diff;
+    _syncAngleInputs();
+    drawAll();
+  }
+}
+
+function _onDragEnd() { _drag = null; }
+
+canvas.addEventListener('mousedown',  _onDragStart);
+canvas.addEventListener('mousemove',  _onDragMove);
+canvas.addEventListener('mouseup',    _onDragEnd);
+canvas.addEventListener('mouseleave', _onDragEnd);
+canvas.addEventListener('touchstart', _onDragStart, { passive: false });
+canvas.addEventListener('touchmove',  _onDragMove,  { passive: false });
+canvas.addEventListener('touchend',   _onDragEnd);
+
+
+function exportCanvas(format) {
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const ext      = format === 'jpeg' ? 'jpg' : 'png';
+
+  // For JPEG we need an opaque background (canvas bg is already drawn)
+  const link = document.createElement('a');
+  link.download = `lens-rings.${ext}`;
+  link.href = canvas.toDataURL(mimeType, 0.95);
+  link.click();
+}
+
+/* =========================================================
+   Checkbox listeners
+   ========================================================= */
+['focus', 'aperture', 'zoom'].forEach(type => {
+  const chk = document.getElementById(`chk-${type}`);
+  chk.addEventListener('change', () => {
+    document.getElementById(`sec-${type}`).style.opacity = chk.checked ? '1' : '0.35';
+    drawAll();
+  });
+});
+
+/* =========================================================
+   Bootstrap: load defaults and draw
+   ========================================================= */
+(function init() {
+  Object.keys(DEFAULTS).forEach(type => {
+    state[type] = [...DEFAULTS[type]];
+    renderTags(type);
+  });
+  _syncAngleInputs();
+  drawAll();
+})();
+</script>
+</body>
+</html>
