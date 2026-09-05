@@ -349,10 +349,12 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function metresToFeetStr(m) {
   if (!isFinite(m)) return '∞';
   const totalInches = m * 39.3701;
-  const feet  = Math.floor(totalInches / 12);
-  const inches = totalInches % 12;
-  if (feet === 0) return `${parseFloat(inches.toFixed(1))}″`;
-  return `${feet}′${parseFloat(inches.toFixed(1))}″`;
+  let feet   = Math.floor(totalInches / 12);
+  let inches = parseFloat((totalInches % 12).toFixed(1));
+  // Carry over when rounding pushes inches to 12
+  if (inches >= 12) { feet += 1; inches = 0; }
+  if (feet === 0) return `${inches}″`;
+  return `${feet}′${inches}″`;
 }
 
 function formatFocus(v) {
@@ -400,7 +402,7 @@ function parseValue(type, raw) {
   }
   if (type === 'aperture') {
     // Accept: "f/1.8", "T/1.8", "T1.8", "1.8"
-    const clean = s.replace(/^[ft]\/?/i, '');
+    const clean = s.replace(/^[fFtT]\/?/, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
