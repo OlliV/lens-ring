@@ -560,7 +560,7 @@ function setEndAngle(val) {
   const endDeg = isNaN(n) ? ((startAngleDeg + sweepDeg) % 360) : ((n % 360) + 360) % 360;
   // Compute sweep from start to end in the active direction
   const DIR = ringDirection === 'ccw' ? -1 : 1;
-  let diff = ((DIR * (endDeg - startAngleDeg)) % 360 + 360) % 360;
+  let diff = ((DIR * (((endDeg - startAngleDeg) % 360) + 360) % 360) % 360 + 360) % 360;
   if (diff < 10)  diff = 10;
   if (diff > 350) diff = 350;
   sweepDeg = diff;
@@ -1021,7 +1021,7 @@ function _onDragMove(e) {
     drawAll();
   } else {
     // Adjust sweep so that end stays near pointer angle
-    let diff = ((DIR * (deg - startAngleDeg)) % 360 + 360) % 360;
+    let diff = ((DIR * (((deg - startAngleDeg) % 360) + 360) % 360) % 360 + 360) % 360;
     if (diff < 10)  diff = 10;
     if (diff > 350) diff = 350;
     sweepDeg = diff;
