@@ -615,8 +615,8 @@ function drawCircularRings(types, CW, CH) {
     /* Marks */
     if (marks.length > 0) {
       const angles = computeAngles(type, marks, START_RAD, START_RAD + SWEEP_RAD);
-      const tickIn  = innerRing - 3;
-      const tickOut = outerRing + 3;
+      const tickIn  = innerRing;
+      const tickOut = outerRing;
 
       marks.forEach((val, i) => {
         const angle = angles[i];
@@ -653,13 +653,14 @@ function drawCircularRings(types, CW, CH) {
         ctx.restore();
       });
     } else {
-      /* "No marks" hint on the arc */
+      /* "No marks" hint: shown at the gap angle, slightly inside the ring label */
+      const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
       ctx.save();
-      ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+      ctx.font = '11px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = '#555';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
-      ctx.fillText('No marks', cx, cy - midR);
+      ctx.fillText('(no marks)', cx + Math.cos(gapAngle) * midR, cy + Math.sin(gapAngle) * midR + 8);
       ctx.restore();
     }
 
@@ -699,47 +700,35 @@ function drawCircularRings(types, CW, CH) {
 }
 
 /* =========================================================
-   Position mapping (logarithmic scale for natural feel)
+   Shared log-scale mapping utility
+   Returns an array of t values in [0, 1] for each mark.
+   Infinity is proxied as 4× the max finite value.
    ========================================================= */
-function computePositions(type, marks, x0, x1) {
-  if (marks.length === 1) return [Math.round((x0 + x1) / 2)];
+function logScaleT(marks) {
+  if (marks.length === 1) return [0.5];
 
-  // Replace Infinity with a value 4× the max finite value for spacing
   const finite = marks.filter(isFinite);
   const maxFin = finite.length ? Math.max(...finite) : 1;
   const INF_PROXY = maxFin * 4;
 
-  const raw = marks.map(v => (isFinite(v) ? v : INF_PROXY));
-
-  // Logarithmic mapping
+  const raw    = marks.map(v => (isFinite(v) ? v : INF_PROXY));
   const logRaw = raw.map(v => Math.log(v + 1e-9));
-  const lo = Math.min(...logRaw);
-  const hi = Math.max(...logRaw);
+  const lo     = Math.min(...logRaw);
+  const hi     = Math.max(...logRaw);
 
-  return raw.map(v => {
-    const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
-    return Math.round(x0 + t * (x1 - x0));
-  });
+  return raw.map(v => (hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo)));
+}
+
+/* =========================================================
+   Position mapping (logarithmic scale for natural feel)
+   ========================================================= */
+function computePositions(type, marks, x0, x1) {
+  return logScaleT(marks).map(t => Math.round(x0 + t * (x1 - x0)));
 }
 
 /* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
 function computeAngles(type, marks, a0, a1) {
-  if (marks.length === 1) return [(a0 + a1) / 2];
-
-  const finite = marks.filter(isFinite);
-  const maxFin = finite.length ? Math.max(...finite) : 1;
-  const INF_PROXY = maxFin * 4;
-
-  const raw = marks.map(v => (isFinite(v) ? v : INF_PROXY));
-
-  const logRaw = raw.map(v => Math.log(v + 1e-9));
-  const lo = Math.min(...logRaw);
-  const hi = Math.max(...logRaw);
-
-  return raw.map(v => {
-    const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
-    return a0 + t * (a1 - a0);
-  });
+  return logScaleT(marks).map(t => a0 + t * (a1 - a0));
 }
 
 /* =========================================================
