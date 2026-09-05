@@ -163,6 +163,31 @@
       background: #111;
     }
 
+    /* Layout toggle */
+    .layout-toggle {
+      display: flex;
+      gap: 8px;
+    }
+
+    .layout-btn {
+      background: #3a3a3a;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #ccc;
+      padding: 5px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .layout-btn:hover { background: #484848; border-color: #777; }
+
+    .layout-btn.active {
+      background: #1a4f8a;
+      border-color: #2a6bc9;
+      color: #fff;
+    }
+
     /* Export */
     .export-row {
       display: flex;
@@ -243,6 +268,15 @@
   </div>
 </div>
 
+<!-- Layout toggle -->
+<div class="panel">
+  <h2>Layout</h2>
+  <div class="layout-toggle">
+    <button class="layout-btn active" id="btn-linear"  onclick="setLayout('linear')">⏤ Linear</button>
+    <button class="layout-btn"        id="btn-circular" onclick="setLayout('circular')">◎ Circular</button>
+  </div>
+</div>
+
 <!-- Canvas -->
 <div class="canvas-wrap">
   <canvas id="ringCanvas" width="1400" height="700"></canvas>
@@ -266,6 +300,8 @@ const state = {
   aperture: [],   // numeric f-number
   zoom:     [],   // numeric mm
 };
+
+let layout = 'linear'; // 'linear' | 'circular'
 
 /* =========================================================
    Defaults so the canvas is not empty on first load
@@ -385,8 +421,6 @@ function renderTags(type) {
    ========================================================= */
 const canvas  = document.getElementById('ringCanvas');
 const ctx     = canvas.getContext('2d');
-const W = canvas.width;
-const H = canvas.height;
 
 function getActiveTypes() {
   return ['focus', 'aperture', 'zoom'].filter(
@@ -394,33 +428,57 @@ function getActiveTypes() {
   );
 }
 
+/* =========================================================
+   Layout switching
+   ========================================================= */
+function setLayout(mode) {
+  layout = mode;
+  document.getElementById('btn-linear').classList.toggle('active', mode === 'linear');
+  document.getElementById('btn-circular').classList.toggle('active', mode === 'circular');
+
+  if (mode === 'circular') {
+    canvas.width  = 700;
+    canvas.height = 700;
+  } else {
+    canvas.width  = 1400;
+    canvas.height = 700;
+  }
+  drawAll();
+}
+
 function drawAll() {
-  ctx.clearRect(0, 0, W, H);
+  const CW = canvas.width;
+  const CH = canvas.height;
+  ctx.clearRect(0, 0, CW, CH);
   ctx.fillStyle = '#111';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, CW, CH);
 
   const types = getActiveTypes();
   if (types.length === 0) return;
 
-  const ringH = Math.floor(H / types.length);
-
-  types.forEach((type, idx) => {
-    drawRing(type, idx * ringH, ringH, state[type]);
-  });
+  if (layout === 'circular') {
+    drawCircularRings(types, CW, CH);
+  } else {
+    const ringH = Math.floor(CH / types.length);
+    types.forEach((type, idx) => {
+      drawRing(type, idx * ringH, ringH, state[type]);
+    });
+  }
 }
 
-/* Draw a single ring strip */
+/* Draw a single ring strip (linear layout) */
 function drawRing(type, y, h, marks) {
-  const col   = COLORS[type];
-  const pad   = 60;          // horizontal padding
-  const cy    = y + h / 2;  // centre y of the strip
-  const rx    = pad;         // left x of rail
-  const rw    = W - pad * 2; // rail width
+  const CW  = canvas.width;
+  const col = COLORS[type];
+  const pad = 60;          // horizontal padding
+  const cy  = y + h / 2;  // centre y of the strip
+  const rx  = pad;         // left x of rail
+  const rw  = CW - pad * 2; // rail width
 
   /* Background */
   ctx.save();
   ctx.beginPath();
-  roundRect(ctx, 0, y + 8, W, h - 16, 12);
+  roundRect(ctx, 0, y + 8, CW, h - 16, 12);
   ctx.fillStyle = col.bg;
   ctx.fill();
   ctx.restore();
@@ -446,13 +504,12 @@ function drawRing(type, y, h, marks) {
   ctx.restore();
 
   if (marks.length === 0) {
-    /* Hint text */
     ctx.save();
     ctx.font = '14px "Segoe UI", system-ui, sans-serif';
     ctx.fillStyle = '#555';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    ctx.fillText('No marks added yet', W / 2, cy);
+    ctx.fillText('No marks added yet', CW / 2, cy);
     ctx.restore();
     return;
   }
@@ -492,16 +549,162 @@ function drawRing(type, y, h, marks) {
 }
 
 /* =========================================================
+   Circular layout
+   =========================================================
+   Rings are drawn as concentric annuli.
+   Ring order from outside in: focus → aperture → zoom.
+   Marks are placed as radial ticks + arc labels over a 270°
+   sweep (leaving a 90° gap at the bottom for the legend).
+   ========================================================= */
+function drawCircularRings(types, CW, CH) {
+  // Ring order (outermost first) — only include active types
+  const ORDER = ['focus', 'aperture', 'zoom'].filter(t => types.includes(t));
+
+  const cx = CW / 2;
+  const cy = CH / 2;
+
+  // Outer radius of outermost ring, inner radius of innermost
+  const outerR   = Math.min(CW, CH) / 2 - 20;
+  const innerCore = outerR * 0.22;    // empty centre
+  const ringBand  = (outerR - innerCore) / (ORDER.length || 1);
+
+  // Angular sweep: 270° starting from bottom-left going clockwise,
+  // i.e. from 135° to 45° passing through top (matching lens barrel feel).
+  const START_DEG = 135;
+  const SWEEP_DEG = 270;
+  const START_RAD = (START_DEG * Math.PI) / 180;
+  const SWEEP_RAD = (SWEEP_DEG * Math.PI) / 180;
+
+  ORDER.forEach((type, ringIdx) => {
+    const col    = COLORS[type];
+    const marks  = state[type];
+    const outerRing = outerR - ringIdx * ringBand;
+    const innerRing = outerRing - ringBand + 4; // 4px gap between rings
+
+    /* Annulus background */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerRing, 0, Math.PI * 2);
+    ctx.arc(cx, cy, innerRing, 0, Math.PI * 2, true);
+    ctx.fillStyle = col.bg;
+    ctx.fill();
+    ctx.restore();
+
+    /* Annulus border */
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerRing, 0, Math.PI * 2);
+    ctx.strokeStyle = col.ring + '55';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerRing, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    /* Centre-line arc (mid-radius) */
+    const midR = (outerRing + innerRing) / 2;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, midR, START_RAD, START_RAD + SWEEP_RAD);
+    ctx.strokeStyle = col.ring + '66';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    /* Marks */
+    if (marks.length > 0) {
+      const angles = computeAngles(type, marks, START_RAD, START_RAD + SWEEP_RAD);
+      const tickIn  = innerRing - 3;
+      const tickOut = outerRing + 3;
+
+      marks.forEach((val, i) => {
+        const angle = angles[i];
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        /* Tick line (radial) */
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(cx + cos * tickIn,  cy + sin * tickIn);
+        ctx.lineTo(cx + cos * tickOut, cy + sin * tickOut);
+        ctx.strokeStyle = col.ring;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        /* Dot on centre-line */
+        ctx.beginPath();
+        ctx.arc(cx + cos * midR, cy + sin * midR, 4, 0, Math.PI * 2);
+        ctx.fillStyle = col.ring;
+        ctx.fill();
+        ctx.restore();
+
+        /* Label — positioned outside the ring */
+        const labelR = tickOut + 14;
+        const lx = cx + cos * labelR;
+        const ly = cy + sin * labelR;
+
+        ctx.save();
+        ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+        ctx.fillStyle = col.text;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
+        ctx.fillText(FORMATTERS[type](val), lx, ly);
+        ctx.restore();
+      });
+    } else {
+      /* "No marks" hint on the arc */
+      ctx.save();
+      ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#555';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.fillText('No marks', cx, cy - midR);
+      ctx.restore();
+    }
+
+    /* Ring label inside the band at the gap position (bottom) */
+    const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
+    ctx.save();
+    ctx.font = `bold 12px "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = col.ring;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    const lx = cx + Math.cos(gapAngle) * midR;
+    const ly = cy + Math.sin(gapAngle) * midR;
+    ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), lx, ly);
+    ctx.restore();
+  });
+
+  /* Lens barrel decoration — innermost circle */
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, innerCore, 0, Math.PI * 2);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  /* Centre cross-hair */
+  ctx.save();
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - 10, cy); ctx.lineTo(cx + 10, cy);
+  ctx.moveTo(cx, cy - 10); ctx.lineTo(cx, cy + 10);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* =========================================================
    Position mapping (logarithmic scale for natural feel)
    ========================================================= */
 function computePositions(type, marks, x0, x1) {
   if (marks.length === 1) return [Math.round((x0 + x1) / 2)];
 
-  // For aperture, f-numbers go from small (bright) to large (dark),
-  // so the "natural" order on a lens ring is usually large-f on the left.
-  // We keep ascending order (wide-open left) to match common lens markings.
-
-  // Replace Infinity with a value 3× the max finite value for spacing
+  // Replace Infinity with a value 4× the max finite value for spacing
   const finite = marks.filter(isFinite);
   const maxFin = finite.length ? Math.max(...finite) : 1;
   const INF_PROXY = maxFin * 4;
@@ -516,6 +719,26 @@ function computePositions(type, marks, x0, x1) {
   return raw.map(v => {
     const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
     return Math.round(x0 + t * (x1 - x0));
+  });
+}
+
+/* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
+function computeAngles(type, marks, a0, a1) {
+  if (marks.length === 1) return [(a0 + a1) / 2];
+
+  const finite = marks.filter(isFinite);
+  const maxFin = finite.length ? Math.max(...finite) : 1;
+  const INF_PROXY = maxFin * 4;
+
+  const raw = marks.map(v => (isFinite(v) ? v : INF_PROXY));
+
+  const logRaw = raw.map(v => Math.log(v + 1e-9));
+  const lo = Math.min(...logRaw);
+  const hi = Math.max(...logRaw);
+
+  return raw.map(v => {
+    const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
+    return a0 + t * (a1 - a0);
   });
 }
 
