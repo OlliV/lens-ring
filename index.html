@@ -437,8 +437,8 @@ function setLayout(mode) {
   document.getElementById('btn-circular').classList.toggle('active', mode === 'circular');
 
   if (mode === 'circular') {
-    canvas.width  = 700;
-    canvas.height = 700;
+    canvas.width  = 900;
+    canvas.height = 900;
   } else {
     canvas.width  = 1400;
     canvas.height = 700;
@@ -563,8 +563,9 @@ function drawCircularRings(types, CW, CH) {
   const cx = CW / 2;
   const cy = CH / 2;
 
-  // Outer radius of outermost ring, inner radius of innermost
-  const outerR   = Math.min(CW, CH) / 2 - 20;
+  // Outer radius of outermost ring, inner radius of innermost.
+  // Leave 80px margin so labels around the outside always fit within the canvas.
+  const outerR    = Math.min(CW, CH) / 2 - 80;
   const innerCore = outerR * 0.22;    // empty centre
   const ringBand  = (outerR - innerCore) / (ORDER.length || 1);
 
