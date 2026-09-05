@@ -234,23 +234,23 @@
 
     <!-- Focus -->
     <div class="mark-section" id="sec-focus">
-      <h3>Focus (m)</h3>
+      <h3 id="lbl-focus">Focus (m)</h3>
       <div class="mark-row">
         <input type="text" id="inp-focus" placeholder="e.g. 0.5 or 1.2" />
         <button class="btn primary" onclick="addMark('focus')">+</button>
       </div>
-      <p class="hint">Distance in metres</p>
+      <p class="hint" id="hint-focus">Distance in metres</p>
       <div class="tag-list" id="tags-focus"></div>
     </div>
 
     <!-- Aperture -->
     <div class="mark-section" id="sec-aperture">
-      <h3>Aperture (f/)</h3>
+      <h3 id="lbl-aperture">Aperture (f/)</h3>
       <div class="mark-row">
         <input type="text" id="inp-aperture" placeholder="e.g. 1.8 or 2.8" />
         <button class="btn primary" onclick="addMark('aperture')">+</button>
       </div>
-      <p class="hint">f-number (the part after "f/")</p>
+      <p class="hint" id="hint-aperture">f-number (the part after "f/")</p>
       <div class="tag-list" id="tags-aperture"></div>
     </div>
 
@@ -265,6 +265,24 @@
       <div class="tag-list" id="tags-zoom"></div>
     </div>
 
+  </div>
+</div>
+
+<!-- Options -->
+<div class="panel">
+  <h2>Options</h2>
+  <div class="modes">
+    <label class="mode-label" title="Distance unit used for focus marks">
+      Focus unit:
+    </label>
+    <button class="layout-btn active" id="btn-metric" onclick="setFocusUnit('metric')">m / cm</button>
+    <button class="layout-btn"        id="btn-feet"   onclick="setFocusUnit('feet')">ft / in</button>
+    <span style="width:20px"></span>
+    <label class="mode-label" title="Aperture stop type">
+      Aperture:
+    </label>
+    <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
+    <button class="layout-btn"        id="btn-tstop" onclick="setStopType('T')">T-stop</button>
   </div>
 </div>
 
@@ -301,7 +319,9 @@ const state = {
   zoom:     [],   // numeric mm
 };
 
-let layout = 'linear'; // 'linear' | 'circular'
+let layout    = 'linear'; // 'linear' | 'circular'
+let focusUnit = 'metric'; // 'metric' | 'feet'
+let stopType  = 'f';      // 'f' | 'T'
 
 /* =========================================================
    Defaults so the canvas is not empty on first load
@@ -326,11 +346,22 @@ const COLORS = {
    ========================================================= */
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// Metres → feet+inches string, e.g. 0.5 → "1′8″", 0.3 → "11.8″"
+function metresToFeetStr(m) {
+  if (!isFinite(m)) return '∞';
+  const totalInches = m * 39.3701;
+  const feet  = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  if (feet === 0) return `${parseFloat(inches.toFixed(1))}″`;
+  return `${feet}′${parseFloat(inches.toFixed(1))}″`;
+}
+
 function formatFocus(v) {
   if (!isFinite(v)) return '∞';
+  if (focusUnit === 'feet') return metresToFeetStr(v);
   return v < 1 ? `${Math.round(v * 100)}cm` : `${v}m`;
 }
-function formatAperture(v) { return `f/${v}`; }
+function formatAperture(v) { return `${stopType}/${v}`; }
 function formatZoom(v)     { return `${v}mm`; }
 
 const FORMATTERS = { focus: formatFocus, aperture: formatAperture, zoom: formatZoom };
@@ -345,13 +376,32 @@ function parseValue(type, raw) {
   if (type === 'focus') {
     // Accept: "inf", "∞", "infinity", or a positive number
     if (/^(inf|infinity|∞)$/i.test(s)) return Infinity;
+    // When in feet mode, accept e.g. "3", "3.5" (feet), "3'6\"", "3'6", "42""
+    if (focusUnit === 'feet') {
+      // Format: feet+inches  e.g. 3'6" or 3'6 or just 3.5
+      const ftIn = s.match(/^(\d+(?:\.\d+)?)'(\d+(?:\.\d+)?)"?$/);
+      if (ftIn) {
+        const metres = (parseFloat(ftIn[1]) * 12 + parseFloat(ftIn[2])) / 39.3701;
+        return metres > 0 ? metres : null;
+      }
+      // Inches-only: e.g. 42"
+      const inOnly = s.match(/^(\d+(?:\.\d+)?)"$/);
+      if (inOnly) {
+        const metres = parseFloat(inOnly[1]) / 39.3701;
+        return metres > 0 ? metres : null;
+      }
+      // Plain number treated as feet
+      const ft = parseFloat(s);
+      if (isNaN(ft) || ft <= 0) return null;
+      return ft * 0.3048;
+    }
     const n = parseFloat(s);
     if (isNaN(n) || n <= 0) return null;
     return n;
   }
   if (type === 'aperture') {
-    // Accept: "f/1.8", "1.8"
-    const clean = s.replace(/^f\//i, '');
+    // Accept: "f/1.8", "T/1.8", "T1.8", "1.8"
+    const clean = s.replace(/^[fFtT]\/?/i, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
@@ -446,7 +496,47 @@ function setLayout(mode) {
   drawAll();
 }
 
-function drawAll() {
+/* =========================================================
+   Options: focus unit and stop type
+   ========================================================= */
+function setFocusUnit(unit) {
+  focusUnit = unit;
+  document.getElementById('btn-metric').classList.toggle('active', unit === 'metric');
+  document.getElementById('btn-feet').classList.toggle('active', unit === 'feet');
+
+  // Update heading and hint
+  document.getElementById('lbl-focus').textContent =
+    unit === 'feet' ? 'Focus (ft)' : 'Focus (m)';
+  document.getElementById('hint-focus').textContent =
+    unit === 'feet'
+      ? "Distance in feet — e.g. 3, 3'6\", 42\""
+      : 'Distance in metres';
+  document.getElementById('inp-focus').placeholder =
+    unit === 'feet' ? "e.g. 3 or 3'6\"" : 'e.g. 0.5 or 1.2';
+
+  renderTags('focus');
+  drawAll();
+}
+
+function setStopType(type) {
+  stopType = type;
+  document.getElementById('btn-fstop').classList.toggle('active', type === 'f');
+  document.getElementById('btn-tstop').classList.toggle('active', type === 'T');
+
+  // Update heading and hint
+  const isTStop = type === 'T';
+  document.getElementById('lbl-aperture').textContent =
+    isTStop ? 'Aperture (T/)' : 'Aperture (f/)';
+  document.getElementById('hint-aperture').textContent =
+    isTStop ? 'T-number (e.g. T1.8 or 1.8)' : 'f-number (the part after "f/")';
+  document.getElementById('inp-aperture').placeholder =
+    isTStop ? 'e.g. T1.8 or 2.8' : 'e.g. 1.8 or 2.8';
+
+  renderTags('aperture');
+  drawAll();
+}
+
+
   const CW = canvas.width;
   const CH = canvas.height;
   ctx.clearRect(0, 0, CW, CH);
