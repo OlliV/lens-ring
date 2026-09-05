@@ -271,14 +271,13 @@
 <!-- Options -->
 <div class="panel">
   <h2>Options</h2>
-  <div class="modes">
+  <div class="modes" style="gap: 10px 18px; align-items: center;">
     <label class="mode-label" title="Distance unit used for focus marks">
       Focus unit:
     </label>
     <button class="layout-btn active" id="btn-metric" onclick="setFocusUnit('metric')">m / cm</button>
     <button class="layout-btn"        id="btn-feet"   onclick="setFocusUnit('feet')">ft / in</button>
-    <span style="width:20px"></span>
-    <label class="mode-label" title="Aperture stop type">
+    <label class="mode-label" title="Aperture stop type" style="margin-left: 14px;">
       Aperture:
     </label>
     <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
@@ -346,7 +345,7 @@ const COLORS = {
    ========================================================= */
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Metres → feet+inches string, e.g. 0.5 → "1′8″", 0.3 → "11.8″"
+// Metres → feet+inches string, e.g. 0.5 → "1′7.7″", 0.3 → "11.8″"
 function metresToFeetStr(m) {
   if (!isFinite(m)) return '∞';
   const totalInches = m * 39.3701;
@@ -401,7 +400,7 @@ function parseValue(type, raw) {
   }
   if (type === 'aperture') {
     // Accept: "f/1.8", "T/1.8", "T1.8", "1.8"
-    const clean = s.replace(/^[fFtT]\/?/i, '');
+    const clean = s.replace(/^[ft]\/?/i, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
