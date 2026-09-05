@@ -281,7 +281,7 @@
       Aperture:
     </label>
     <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
-    <button class="layout-btn"        id="btn-tstop" onclick="setStopType('T')">T-stop</button>
+    <button class="layout-btn"        id="btn-tstop" onclick="setStopType('t')">T-stop</button>
   </div>
 </div>
 
@@ -362,7 +362,7 @@ function formatFocus(v) {
   if (focusUnit === 'feet') return metresToFeetStr(v);
   return v < 1 ? `${Math.round(v * 100)}cm` : `${v}m`;
 }
-function formatAperture(v) { return stopType === 'T' ? `T${v}` : `f/${v}`; }
+function formatAperture(v) { return stopType === 't' ? `T${v}` : `f/${v}`; }
 function formatZoom(v)     { return `${v}mm`; }
 
 const FORMATTERS = { focus: formatFocus, aperture: formatAperture, zoom: formatZoom };
@@ -401,8 +401,8 @@ function parseValue(type, raw) {
     return n;
   }
   if (type === 'aperture') {
-    // Accept: "f/1.8", "f1.8", "F/1.8", "T/1.8", "T1.8", "t1.8", or bare "1.8"
-    const clean = s.replace(/^[fF]\/?|^[tT]\/?/, '');
+    // Accept "f/", "F/", "f", "F", "T/", "T", "t/", "t" prefixes or bare number
+    const clean = s.replace(/^[fFtT]\/?/, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
@@ -522,10 +522,10 @@ function setFocusUnit(unit) {
 function setStopType(type) {
   stopType = type;
   document.getElementById('btn-fstop').classList.toggle('active', type === 'f');
-  document.getElementById('btn-tstop').classList.toggle('active', type === 'T');
+  document.getElementById('btn-tstop').classList.toggle('active', type === 't');
 
   // Update heading and hint
-  const isTStop = type === 'T';
+  const isTStop = type === 't';
   document.getElementById('lbl-aperture').textContent =
     isTStop ? 'Aperture (T)' : 'Aperture (f/)';
   document.getElementById('hint-aperture').textContent =
