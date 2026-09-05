@@ -560,7 +560,7 @@ function setEndAngle(val) {
   const endDeg = isNaN(n) ? ((startAngleDeg + sweepDeg) % 360) : ((n % 360) + 360) % 360;
   // Compute sweep from start to end in the active direction
   const DIR = ringDirection === 'ccw' ? -1 : 1;
-  let diff = DIR * (((endDeg - startAngleDeg) * DIR + 360) % 360);
+  let diff = ((DIR * (endDeg - startAngleDeg)) % 360 + 360) % 360;
   if (diff < 10)  diff = 10;
   if (diff > 350) diff = 350;
   sweepDeg = diff;
@@ -885,10 +885,10 @@ function drawCircularRings(types, CW, CH) {
   ctx.stroke();
   ctx.restore();
 
-  /* Drag handles — drawn outside the outermost ring */
+  /* Drag handles — drawn outside the outermost ring (no labels to avoid overlap) */
   const handleR  = outerR + 14;
   const HANDLE_RADIUS = 8;
-  [[START_RAD, '#4ea8ff', 'S'], [END_RAD, '#ffa040', 'E']].forEach(([angle, color, label]) => {
+  [[START_RAD, '#4ea8ff'], [END_RAD, '#ffa040']].forEach(([angle, color]) => {
     const hx = cx + Math.cos(angle) * handleR;
     const hy = cy + Math.sin(angle) * handleR;
     ctx.save();
@@ -899,11 +899,6 @@ function drawCircularRings(types, CW, CH) {
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.font = 'bold 9px "Segoe UI", system-ui, sans-serif';
-    ctx.fillStyle = '#111';
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'center';
-    ctx.fillText(label, hx, hy);
     ctx.restore();
   });
 
@@ -1026,7 +1021,7 @@ function _onDragMove(e) {
     drawAll();
   } else {
     // Adjust sweep so that end stays near pointer angle
-    let diff = DIR * (((deg - startAngleDeg) * DIR + 360) % 360);
+    let diff = ((DIR * (deg - startAngleDeg)) % 360 + 360) % 360;
     if (diff < 10)  diff = 10;
     if (diff > 350) diff = 350;
     sweepDeg = diff;
