@@ -401,8 +401,8 @@ function parseValue(type, raw) {
     return n;
   }
   if (type === 'aperture') {
-    // Accept: "f/1.8", "f1.8", "F/1.8", "T/1.8", "T1.8", or bare "1.8"
-    const clean = s.replace(/^[fF]\/?|^T\/?/, '');
+    // Accept: "f/1.8", "f1.8", "F/1.8", "T/1.8", "T1.8", "t1.8", or bare "1.8"
+    const clean = s.replace(/^[fF]\/?|^[tT]\/?/, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
