@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lens Ring Visualizer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px;
+      gap: 20px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: #fff;
+    }
+
+    .panel {
+      background: #252525;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 18px 20px;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    .panel h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    /* Ring mode checkboxes */
+    .modes {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .mode-label {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      user-select: none;
+    }
+
+    .mode-label input[type=checkbox] {
+      width: 16px; height: 16px;
+      accent-color: #4ea8ff;
+      cursor: pointer;
+    }
+
+    /* Marks list */
+    .marks-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mark-section h3 {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .mark-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .mark-row input[type=text] {
+      flex: 1;
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 5px 8px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .mark-row input[type=text]:focus { border-color: #4ea8ff; }
+
+    .mark-row input[type=text].invalid { border-color: #ff4e4e; }
+
+    .btn {
+      background: #3a3a3a;
+      border: 1px solid #555;
+      border-radius: 6px;
+      color: #ccc;
+      padding: 5px 10px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn:hover { background: #484848; border-color: #777; }
+
+    .btn.primary {
+      background: #1a4f8a;
+      border-color: #2a6bc9;
+      color: #fff;
+    }
+    .btn.primary:hover { background: #2260aa; }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      min-height: 26px;
+    }
+
+    .tag {
+      background: #333;
+      border: 1px solid #555;
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .tag .remove {
+      cursor: pointer;
+      color: #888;
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+    .tag .remove:hover { color: #ff6b6b; }
+
+    /* Canvas area */
+    .canvas-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 700px;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      border-radius: 12px;
+      background: #111;
+    }
+
+    /* Export */
+    .export-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Validation hint */
+    .hint {
+      font-size: 0.72rem;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 520px) {
+      .marks-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔭 Lens Ring Visualizer</h1>
+
+<!-- Ring mode selection -->
+<div class="panel">
+  <h2>Rings to Display</h2>
+  <div class="modes">
+    <label class="mode-label">
+      <input type="checkbox" id="chk-focus" checked /> Focus
+    </label>
+    <label class="mode-label">
+      <input type="checkbox" id="chk-aperture" checked /> Aperture
+    </label>
+    <label class="mode-label">
+      <input type="checkbox" id="chk-zoom" checked /> Zoom
+    </label>
+  </div>
+</div>
+
+<!-- Marks input -->
+<div class="panel">
+  <h2>Markings</h2>
+  <div class="marks-grid">
+
+    <!-- Focus -->
+    <div class="mark-section" id="sec-focus">
+      <h3>Focus (m)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-focus" placeholder="e.g. 0.5 or 1.2" />
+        <button class="btn primary" onclick="addMark('focus')">+</button>
+      </div>
+      <p class="hint">Distance in metres</p>
+      <div class="tag-list" id="tags-focus"></div>
+    </div>
+
+    <!-- Aperture -->
+    <div class="mark-section" id="sec-aperture">
+      <h3>Aperture (f/)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-aperture" placeholder="e.g. 1.8 or 2.8" />
+        <button class="btn primary" onclick="addMark('aperture')">+</button>
+      </div>
+      <p class="hint">f-number (the part after "f/")</p>
+      <div class="tag-list" id="tags-aperture"></div>
+    </div>
+
+    <!-- Zoom -->
+    <div class="mark-section" id="sec-zoom">
+      <h3>Focal Length (mm)</h3>
+      <div class="mark-row">
+        <input type="text" id="inp-zoom" placeholder="e.g. 24 or 70" />
+        <button class="btn primary" onclick="addMark('zoom')">+</button>
+      </div>
+      <p class="hint">Focal length in millimetres</p>
+      <div class="tag-list" id="tags-zoom"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Canvas -->
+<div class="canvas-wrap">
+  <canvas id="ringCanvas" width="1400" height="700"></canvas>
+</div>
+
+<!-- Export -->
+<div class="panel">
+  <h2>Export</h2>
+  <div class="export-row">
+    <button class="btn primary" onclick="exportCanvas('png')">⬇ Download PNG</button>
+    <button class="btn primary" onclick="exportCanvas('jpeg')">⬇ Download JPEG</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   State
+   ========================================================= */
+const state = {
+  focus:    [],   // numeric metres
+  aperture: [],   // numeric f-number
+  zoom:     [],   // numeric mm
+};
+
+/* =========================================================
+   Defaults so the canvas is not empty on first load
+   ========================================================= */
+const DEFAULTS = {
+  focus:    [0.3, 0.5, 0.7, 1, 1.5, 2, 3, 5, 10, Infinity],
+  aperture: [1.4, 1.8, 2, 2.8, 4, 5.6, 8, 11, 16, 22],
+  zoom:     [24, 28, 35, 50, 70, 85, 100, 135, 200],
+};
+
+/* =========================================================
+   Ring display colours
+   ========================================================= */
+const COLORS = {
+  focus:    { ring: '#4ea8ff', text: '#b8d9ff', bg: '#0d2a4a' },
+  aperture: { ring: '#ff9f4e', text: '#ffd8b0', bg: '#3a2000' },
+  zoom:     { ring: '#6adf7e', text: '#c0f5c8', bg: '#0a2d12' },
+};
+
+/* =========================================================
+   Helpers
+   ========================================================= */
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function formatFocus(v) {
+  if (!isFinite(v)) return '∞';
+  return v < 1 ? `${Math.round(v * 100)}cm` : `${v}m`;
+}
+function formatAperture(v) { return `f/${v}`; }
+function formatZoom(v)     { return `${v}mm`; }
+
+const FORMATTERS = { focus: formatFocus, aperture: formatAperture, zoom: formatZoom };
+
+/* =========================================================
+   Mark management
+   ========================================================= */
+function parseValue(type, raw) {
+  const s = raw.trim();
+  if (!s) return null;
+
+  if (type === 'focus') {
+    // Accept: "inf", "∞", "infinity", or a positive number
+    if (/^(inf|infinity|∞)$/i.test(s)) return Infinity;
+    const n = parseFloat(s);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  if (type === 'aperture') {
+    // Accept: "f/1.8", "1.8"
+    const clean = s.replace(/^f\//i, '');
+    const n = parseFloat(clean);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  if (type === 'zoom') {
+    // Accept: "24mm", "24"
+    const clean = s.replace(/mm$/i, '');
+    const n = parseFloat(clean);
+    if (isNaN(n) || n <= 0) return null;
+    return n;
+  }
+  return null;
+}
+
+function addMark(type) {
+  const inp = document.getElementById(`inp-${type}`);
+  const val = parseValue(type, inp.value);
+  if (val === null) {
+    inp.classList.add('invalid');
+    setTimeout(() => inp.classList.remove('invalid'), 1200);
+    return;
+  }
+  if (!state[type].includes(val)) {
+    state[type].push(val);
+    state[type].sort((a, b) => a - b);
+  }
+  inp.value = '';
+  renderTags(type);
+  drawAll();
+}
+
+function removeMark(type, val) {
+  state[type] = state[type].filter(v => v !== val);
+  renderTags(type);
+  drawAll();
+}
+
+function renderTags(type) {
+  const container = document.getElementById(`tags-${type}`);
+  container.innerHTML = '';
+  state[type].forEach(v => {
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = `${FORMATTERS[type](v)} <span class="remove" title="Remove">×</span>`;
+    tag.querySelector('.remove').addEventListener('click', () => removeMark(type, v));
+    container.appendChild(tag);
+  });
+}
+
+/* Allow Enter key to add */
+['focus', 'aperture', 'zoom'].forEach(type => {
+  document.getElementById(`inp-${type}`).addEventListener('keydown', e => {
+    if (e.key === 'Enter') addMark(type);
+  });
+});
+
+/* =========================================================
+   Canvas drawing
+   ========================================================= */
+const canvas  = document.getElementById('ringCanvas');
+const ctx     = canvas.getContext('2d');
+const W = canvas.width;
+const H = canvas.height;
+
+function getActiveTypes() {
+  return ['focus', 'aperture', 'zoom'].filter(
+    t => document.getElementById(`chk-${t}`).checked
+  );
+}
+
+function drawAll() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  const types = getActiveTypes();
+  if (types.length === 0) return;
+
+  const ringH = Math.floor(H / types.length);
+
+  types.forEach((type, idx) => {
+    drawRing(type, idx * ringH, ringH, state[type]);
+  });
+}
+
+/* Draw a single ring strip */
+function drawRing(type, y, h, marks) {
+  const col   = COLORS[type];
+  const pad   = 60;          // horizontal padding
+  const cy    = y + h / 2;  // centre y of the strip
+  const rx    = pad;         // left x of rail
+  const rw    = W - pad * 2; // rail width
+
+  /* Background */
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, 0, y + 8, W, h - 16, 12);
+  ctx.fillStyle = col.bg;
+  ctx.fill();
+  ctx.restore();
+
+  /* Label */
+  ctx.save();
+  ctx.font = 'bold 18px "Segoe UI", system-ui, sans-serif';
+  ctx.fillStyle = col.ring;
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  const label = type.charAt(0).toUpperCase() + type.slice(1);
+  ctx.fillText(label, 14, cy);
+  ctx.restore();
+
+  /* Rail line */
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(rx, cy);
+  ctx.lineTo(rx + rw, cy);
+  ctx.strokeStyle = col.ring + '66';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+
+  if (marks.length === 0) {
+    /* Hint text */
+    ctx.save();
+    ctx.font = '14px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = '#555';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+    ctx.fillText('No marks added yet', W / 2, cy);
+    ctx.restore();
+    return;
+  }
+
+  /* Map value → x position using a log-like scale */
+  const positions = computePositions(type, marks, rx, rx + rw);
+
+  marks.forEach((val, i) => {
+    const x = positions[i];
+    const tickH = 24;
+
+    /* Tick line */
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x, cy - tickH);
+    ctx.lineTo(x, cy + tickH);
+    ctx.strokeStyle = col.ring;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    /* Dot */
+    ctx.beginPath();
+    ctx.arc(x, cy, 5, 0, Math.PI * 2);
+    ctx.fillStyle = col.ring;
+    ctx.fill();
+    ctx.restore();
+
+    /* Label */
+    ctx.save();
+    ctx.font = '13px "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = col.text;
+    ctx.textBaseline = 'bottom';
+    ctx.textAlign = 'center';
+    ctx.fillText(FORMATTERS[type](val), x, cy - tickH - 3);
+    ctx.restore();
+  });
+}
+
+/* =========================================================
+   Position mapping (logarithmic scale for natural feel)
+   ========================================================= */
+function computePositions(type, marks, x0, x1) {
+  if (marks.length === 1) return [Math.round((x0 + x1) / 2)];
+
+  // For aperture, f-numbers go from small (bright) to large (dark),
+  // so the "natural" order on a lens ring is usually large-f on the left.
+  // We keep ascending order (wide-open left) to match common lens markings.
+
+  // Replace Infinity with a value 3× the max finite value for spacing
+  const finite = marks.filter(isFinite);
+  const maxFin = finite.length ? Math.max(...finite) : 1;
+  const INF_PROXY = maxFin * 4;
+
+  const raw = marks.map(v => (isFinite(v) ? v : INF_PROXY));
+
+  // Logarithmic mapping
+  const lo = Math.log(raw[0] + 1e-9);
+  const hi = Math.log(raw[raw.length - 1] + 1e-9);
+
+  return raw.map(v => {
+    const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
+    return Math.round(x0 + t * (x1 - x0));
+  });
+}
+
+/* =========================================================
+   Utility: rounded rect (polyfill for older browsers)
+   ========================================================= */
+function roundRect(ctx, x, y, w, h, r) {
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, w, h, r);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y,     x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x,     y + h, r);
+    ctx.arcTo(x,     y + h, x,     y,     r);
+    ctx.arcTo(x,     y,     x + w, y,     r);
+    ctx.closePath();
+  }
+}
+
+/* =========================================================
+   Export
+   ========================================================= */
+function exportCanvas(format) {
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+  const ext      = format === 'jpeg' ? 'jpg' : 'png';
+
+  // For JPEG we need an opaque background (canvas bg is already drawn)
+  const link = document.createElement('a');
+  link.download = `lens-rings.${ext}`;
+  link.href = canvas.toDataURL(mimeType, 0.95);
+  link.click();
+}
+
+/* =========================================================
+   Checkbox listeners
+   ========================================================= */
+['focus', 'aperture', 'zoom'].forEach(type => {
+  const chk = document.getElementById(`chk-${type}`);
+  chk.addEventListener('change', () => {
+    document.getElementById(`sec-${type}`).style.opacity = chk.checked ? '1' : '0.35';
+    drawAll();
+  });
+});
+
+/* =========================================================
+   Bootstrap: load defaults and draw
+   ========================================================= */
+(function init() {
+  Object.keys(DEFAULTS).forEach(type => {
+    state[type] = [...DEFAULTS[type]];
+    renderTags(type);
+  });
+  drawAll();
+})();
+</script>
+</body>
+</html>
