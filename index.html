@@ -68,7 +68,7 @@
     /* Marks list */
     .marks-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
 
@@ -359,8 +359,16 @@ function renderTags(type) {
   state[type].forEach(v => {
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.innerHTML = `${FORMATTERS[type](v)} <span class="remove" title="Remove">×</span>`;
-    tag.querySelector('.remove').addEventListener('click', () => removeMark(type, v));
+
+    const label = document.createTextNode(FORMATTERS[type](v) + ' ');
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'remove';
+    removeBtn.title = 'Remove';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => removeMark(type, v));
+
+    tag.appendChild(label);
+    tag.appendChild(removeBtn);
     container.appendChild(tag);
   });
 }
@@ -501,8 +509,9 @@ function computePositions(type, marks, x0, x1) {
   const raw = marks.map(v => (isFinite(v) ? v : INF_PROXY));
 
   // Logarithmic mapping
-  const lo = Math.log(raw[0] + 1e-9);
-  const hi = Math.log(raw[raw.length - 1] + 1e-9);
+  const logRaw = raw.map(v => Math.log(v + 1e-9));
+  const lo = Math.min(...logRaw);
+  const hi = Math.max(...logRaw);
 
   return raw.map(v => {
     const t = hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo);
