@@ -885,12 +885,11 @@ function drawCircularRings(types, CW, CH) {
   ctx.stroke();
   ctx.restore();
 
-  /* Drag handles — drawn outside the outermost ring (no labels to avoid overlap) */
-  const handleR  = outerR + 14;
-  const HANDLE_RADIUS = 8;
+  /* Drag handles — small dots on the outermost arc at start and end of sweep */
+  const HANDLE_RADIUS = 6;
   [[START_RAD, '#4ea8ff'], [END_RAD, '#ffa040']].forEach(([angle, color]) => {
-    const hx = cx + Math.cos(angle) * handleR;
-    const hy = cy + Math.sin(angle) * handleR;
+    const hx = cx + Math.cos(angle) * outerR;
+    const hy = cy + Math.sin(angle) * outerR;
     ctx.save();
     ctx.beginPath();
     ctx.arc(hx, hy, HANDLE_RADIUS, 0, Math.PI * 2);
@@ -984,10 +983,10 @@ function _onDragStart(e) {
   if (layout !== 'circular' || !_circ) return;
   const pos = _canvasPos(e);
   const HIT = 20; // pixels
-  if (_handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR + 14, HIT)) {
+  if (_handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR, HIT)) {
     _drag = { handle: 'start' };
     e.preventDefault();
-  } else if (_handleHit(pos, _circ.endRad, _circ.cx, _circ.cy, _circ.outerR + 14, HIT)) {
+  } else if (_handleHit(pos, _circ.endRad, _circ.cx, _circ.cy, _circ.outerR, HIT)) {
     _drag = { handle: 'end' };
     e.preventDefault();
   }
@@ -999,8 +998,8 @@ function _onDragMove(e) {
     if (layout === 'circular' && _circ) {
       const pos = _canvasPos(e);
       const HIT = 20;
-      const near = _handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR + 14, HIT)
-                || _handleHit(pos, _circ.endRad,   _circ.cx, _circ.cy, _circ.outerR + 14, HIT);
+      const near = _handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR, HIT)
+                || _handleHit(pos, _circ.endRad,   _circ.cx, _circ.cy, _circ.outerR, HIT);
       canvas.style.cursor = near ? 'grab' : '';
     } else {
       canvas.style.cursor = '';
