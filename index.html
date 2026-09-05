@@ -612,6 +612,11 @@ function drawCircularRings(types, CW, CH) {
     ctx.stroke();
     ctx.restore();
 
+    /* Gap angle (the 90° opening at the bottom of the sweep ring) */
+    const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
+    const gapCos   = Math.cos(gapAngle);
+    const gapSin   = Math.sin(gapAngle);
+
     /* Marks */
     if (marks.length > 0) {
       const angles = computeAngles(marks, START_RAD, START_RAD + SWEEP_RAD);
@@ -653,28 +658,23 @@ function drawCircularRings(types, CW, CH) {
         ctx.restore();
       });
     } else {
-      /* "(no marks)" hint shown just outside the ring at the gap angle */
-      const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
-      const hintR = outerRing + 14;
+      /* "(no marks)" hint — inside the band, just below the ring label */
       ctx.save();
       ctx.font = '11px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = '#555';
-      ctx.textBaseline = 'middle';
+      ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
-      ctx.fillText('(no marks)', cx + Math.cos(gapAngle) * hintR, cy + Math.sin(gapAngle) * hintR);
+      ctx.fillText('(no marks)', cx + gapCos * midR, cy + gapSin * midR + 10);
       ctx.restore();
     }
 
-    /* Ring label inside the band at the gap position (bottom) */
-    const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
+    /* Ring label inside the band at the gap position */
     ctx.save();
     ctx.font = `bold 12px "Segoe UI", system-ui, sans-serif`;
     ctx.fillStyle = col.ring;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
-    const lx = cx + Math.cos(gapAngle) * midR;
-    const ly = cy + Math.sin(gapAngle) * midR;
-    ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), lx, ly);
+    ctx.fillText(type.charAt(0).toUpperCase() + type.slice(1), cx + gapCos * midR, cy + gapSin * midR);
     ctx.restore();
   });
 
