@@ -515,7 +515,7 @@ function drawRing(type, y, h, marks) {
   }
 
   /* Map value → x position using a log-like scale */
-  const positions = computePositions(type, marks, rx, rx + rw);
+  const positions = computePositions(marks, rx, rx + rw);
 
   marks.forEach((val, i) => {
     const x = positions[i];
@@ -614,7 +614,7 @@ function drawCircularRings(types, CW, CH) {
 
     /* Marks */
     if (marks.length > 0) {
-      const angles = computeAngles(type, marks, START_RAD, START_RAD + SWEEP_RAD);
+      const angles = computeAngles(marks, START_RAD, START_RAD + SWEEP_RAD);
       const tickIn  = innerRing;
       const tickOut = outerRing;
 
@@ -653,14 +653,15 @@ function drawCircularRings(types, CW, CH) {
         ctx.restore();
       });
     } else {
-      /* "No marks" hint: shown at the gap angle, slightly inside the ring label */
+      /* "(no marks)" hint shown just outside the ring at the gap angle */
       const gapAngle = START_RAD + SWEEP_RAD + (2 * Math.PI - SWEEP_RAD) / 2;
+      const hintR = outerRing + 14;
       ctx.save();
       ctx.font = '11px "Segoe UI", system-ui, sans-serif';
       ctx.fillStyle = '#555';
-      ctx.textBaseline = 'top';
+      ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
-      ctx.fillText('(no marks)', cx + Math.cos(gapAngle) * midR, cy + Math.sin(gapAngle) * midR + 8);
+      ctx.fillText('(no marks)', cx + Math.cos(gapAngle) * hintR, cy + Math.sin(gapAngle) * hintR);
       ctx.restore();
     }
 
@@ -722,12 +723,12 @@ function logScaleT(marks) {
 /* =========================================================
    Position mapping (logarithmic scale for natural feel)
    ========================================================= */
-function computePositions(type, marks, x0, x1) {
+function computePositions(marks, x0, x1) {
   return logScaleT(marks).map(t => Math.round(x0 + t * (x1 - x0)));
 }
 
 /* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
-function computeAngles(type, marks, a0, a1) {
+function computeAngles(marks, a0, a1) {
   return logScaleT(marks).map(t => a0 + t * (a1 - a0));
 }
 
