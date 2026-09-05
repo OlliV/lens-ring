@@ -751,9 +751,9 @@ function drawCircularRings(types, CW, CH) {
   const innerCore = outerR * 0.22;    // empty centre
   const ringBand  = (outerR - innerCore) / (ORDER.length || 1);
 
-  // Angular sweep: 270°, driven by startAngleDeg and ringDirection.
+  // Angular sweep: driven by sweepDeg and ringDirection.
   // START_RAD is where the minimum value lands; the sweep goes clockwise (CW)
-  // or counter-clockwise (CCW) for 270°.
+  // or counter-clockwise (CCW) for the configured number of degrees.
   const SWEEP_DEG = sweepDeg;
   const START_RAD = (startAngleDeg * Math.PI) / 180;
   const SWEEP_RAD = (SWEEP_DEG * Math.PI) / 180;
@@ -999,7 +999,20 @@ function _onDragStart(e) {
 }
 
 function _onDragMove(e) {
-  if (!_drag || !_circ) return;
+  /* Update cursor when hovering over drag handles (no active drag) */
+  if (!_drag) {
+    if (layout === 'circular' && _circ) {
+      const pos = _canvasPos(e);
+      const HIT = 20;
+      const near = _handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR + 14, HIT)
+                || _handleHit(pos, _circ.endRad,   _circ.cx, _circ.cy, _circ.outerR + 14, HIT);
+      canvas.style.cursor = near ? 'grab' : '';
+    } else {
+      canvas.style.cursor = '';
+    }
+    return;
+  }
+
   e.preventDefault();
   const pos   = _canvasPos(e);
   const angle = Math.atan2(pos.y - _circ.cy, pos.x - _circ.cx);
@@ -1031,16 +1044,6 @@ canvas.addEventListener('mouseleave', _onDragEnd);
 canvas.addEventListener('touchstart', _onDragStart, { passive: false });
 canvas.addEventListener('touchmove',  _onDragMove,  { passive: false });
 canvas.addEventListener('touchend',   _onDragEnd);
-
-/* Update cursor when hovering over drag handles */
-canvas.addEventListener('mousemove', (e) => {
-  if (layout !== 'circular' || !_circ) { canvas.style.cursor = ''; return; }
-  const pos = _canvasPos(e);
-  const HIT = 20;
-  const near = _handleHit(pos, _circ.startRad, _circ.cx, _circ.cy, _circ.outerR + 14, HIT)
-            || _handleHit(pos, _circ.endRad,   _circ.cx, _circ.cy, _circ.outerR + 14, HIT);
-  canvas.style.cursor = near ? 'grab' : '';
-});
 
 
 function exportCanvas(format) {
