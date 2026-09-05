@@ -362,7 +362,7 @@ function formatFocus(v) {
   if (focusUnit === 'feet') return metresToFeetStr(v);
   return v < 1 ? `${Math.round(v * 100)}cm` : `${v}m`;
 }
-function formatAperture(v) { return `${stopType}/${v}`; }
+function formatAperture(v) { return stopType === 'T' ? `T${v}` : `f/${v}`; }
 function formatZoom(v)     { return `${v}mm`; }
 
 const FORMATTERS = { focus: formatFocus, aperture: formatAperture, zoom: formatZoom };
@@ -401,8 +401,8 @@ function parseValue(type, raw) {
     return n;
   }
   if (type === 'aperture') {
-    // Accept: "f/1.8", "F/1.8", "T/1.8", "T1.8", "1.8"
-    const clean = s.replace(/^[fF]\/|^T\/?/, '');
+    // Accept: "f/1.8", "F/1.8" (f-stop), "T1.8" or "T/1.8" (T-stop), or bare "1.8"
+    const clean = s.replace(/^[fF]\/|^T\/?\s*/, '');
     const n = parseFloat(clean);
     if (isNaN(n) || n <= 0) return null;
     return n;
@@ -527,7 +527,7 @@ function setStopType(type) {
   // Update heading and hint
   const isTStop = type === 'T';
   document.getElementById('lbl-aperture').textContent =
-    isTStop ? 'Aperture (T/)' : 'Aperture (f/)';
+    isTStop ? 'Aperture (T)' : 'Aperture (f/)';
   document.getElementById('hint-aperture').textContent =
     isTStop ? 'T-number (e.g. T1.8 or 1.8)' : 'f-number (the part after "f/")';
   document.getElementById('inp-aperture').placeholder =
