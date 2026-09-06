@@ -692,9 +692,9 @@ function drawRing(type, y, h, marks) {
     return;
   }
 
-  /* Map value → x position using a log-like scale.
+  /* Map value → x position using the type-specific scale.
      When direction is CCW, mirror the positions so the rail reads right-to-left. */
-  const rawPositions = computePositions(marks, rx, rx + rw);
+  const rawPositions = computePositions(type, marks, rx, rx + rw);
   const positions = ringDirection === 'ccw'
     ? rawPositions.map(x => rx + rw - (x - rx))
     : rawPositions;
@@ -805,7 +805,7 @@ function drawCircularRings(types, CW, CH) {
 
     /* Marks */
     if (marks.length > 0) {
-      const angles = computeAngles(marks, START_RAD, END_RAD);
+      const angles = computeAngles(type, marks, START_RAD, END_RAD);
       const tickIn  = innerRing;
       const tickOut = outerRing;
 
@@ -906,10 +906,21 @@ function drawCircularRings(types, CW, CH) {
 }
 
 /* =========================================================
-   Shared log-scale mapping utility
-   Returns an array of t values in [0, 1] for each mark.
-   Infinity is proxied as 4× the max finite value.
+   Shared scale mapping utilities
+   Focus marks use a diopter scale (1 / distance), which is the
+   common optics-friendly way to make marks bunch up towards ∞.
+   Aperture and zoom keep the existing log-like spacing.
    ========================================================= */
+function diopterScaleT(marks) {
+  if (marks.length === 1) return [0.5];
+
+  const diopters = marks.map(v => (isFinite(v) ? 1 / v : 0));
+  const lo = Math.min(...diopters);
+  const hi = Math.max(...diopters);
+
+  return diopters.map(v => (hi === lo ? 0.5 : (hi - v) / (hi - lo)));
+}
+
 function logScaleT(marks) {
   if (marks.length === 1) return [0.5];
 
@@ -925,16 +936,20 @@ function logScaleT(marks) {
   return raw.map(v => (hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo)));
 }
 
-/* =========================================================
-   Position mapping (logarithmic scale for natural feel)
-   ========================================================= */
-function computePositions(marks, x0, x1) {
-  return logScaleT(marks).map(t => Math.round(x0 + t * (x1 - x0)));
+function scaleT(type, marks) {
+  return type === 'focus' ? diopterScaleT(marks) : logScaleT(marks);
 }
 
-/* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
-function computeAngles(marks, a0, a1) {
-  return logScaleT(marks).map(t => a0 + t * (a1 - a0));
+/* =========================================================
+   Position mapping
+   ========================================================= */
+function computePositions(type, marks, x0, x1) {
+  return scaleT(type, marks).map(t => Math.round(x0 + t * (x1 - x0)));
+}
+
+/* Same scale mapping but onto an angular range [a0, a1] (radians) */
+function computeAngles(type, marks, a0, a1) {
+  return scaleT(type, marks).map(t => a0 + t * (a1 - a0));
 }
 
 /* =========================================================
