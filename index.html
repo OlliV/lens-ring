@@ -1210,6 +1210,8 @@ function exportCanvas(format) {
    Sessions — local storage persistence
    ========================================================= */
 const SESSIONS_KEY = 'lens-ring-sessions';
+const MAX_IMPORTED_SESSIONS = 100;
+const SESSION_INFINITY = '__INF__';
 
 function _loadSessions() {
   try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; }
@@ -1220,9 +1222,60 @@ function _saveSessions(sessions) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
 
+function _encodeSessionMarks(type, values) {
+  return values.map(v => (type === 'focus' && !isFinite(v) ? SESSION_INFINITY : v));
+}
+
+function _decodeSessionMarks(type, values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === null) ? Infinity : v))
+    .filter(v => typeof v === 'number' && (type === 'focus' ? (v > 0 || !isFinite(v)) : (isFinite(v) && v > 0)));
+}
+
+function _sanitizeSessionEntry(entry) {
+  if (!entry || typeof entry !== 'object' || typeof entry.name !== 'string') return null;
+  const name = entry.name.trim();
+  if (!name || !entry.state || typeof entry.state !== 'object') return null;
+
+  const sanitized = {
+    name,
+    state: {
+      focus:    _decodeSessionMarks('focus', entry.state.focus),
+      aperture: _decodeSessionMarks('aperture', entry.state.aperture),
+      zoom:     _decodeSessionMarks('zoom', entry.state.zoom),
+    },
+    activeRings: {
+      focus:    entry.activeRings ? entry.activeRings.focus !== false : true,
+      aperture: entry.activeRings ? entry.activeRings.aperture !== false : true,
+      zoom:     entry.activeRings ? entry.activeRings.zoom !== false : true,
+    },
+  };
+
+  if (entry.layout === 'linear' || entry.layout === 'circular') sanitized.layout = entry.layout;
+  if (entry.focusUnit === 'metric' || entry.focusUnit === 'feet') sanitized.focusUnit = entry.focusUnit;
+  if (entry.stopType === 'f' || entry.stopType === 't') sanitized.stopType = entry.stopType;
+  if (entry.ringDirection === 'cw' || entry.ringDirection === 'ccw') sanitized.ringDirection = entry.ringDirection;
+
+  const parsedGap = parseInt(entry.focusInfinityGap, 10);
+  if (!isNaN(parsedGap)) sanitized.focusInfinityGap = clamp(parsedGap, 5, 50);
+
+  const parsedStart = parseInt(entry.startAngleDeg, 10);
+  if (!isNaN(parsedStart)) sanitized.startAngleDeg = ((parsedStart % 360) + 360) % 360;
+
+  const parsedSweep = parseInt(entry.sweepDeg, 10);
+  if (!isNaN(parsedSweep)) sanitized.sweepDeg = clamp(parsedSweep, 10, 350);
+
+  return sanitized;
+}
+
 function _captureState() {
   return {
-    state:         { focus: [...state.focus], aperture: [...state.aperture], zoom: [...state.zoom] },
+    state:         {
+      focus:    _encodeSessionMarks('focus', state.focus),
+      aperture: _encodeSessionMarks('aperture', state.aperture),
+      zoom:     _encodeSessionMarks('zoom', state.zoom),
+    },
     layout,
     focusUnit,
     stopType,
@@ -1239,28 +1292,31 @@ function _captureState() {
 }
 
 function _applyState(s) {
+  const session = _sanitizeSessionEntry(s);
+  if (!session) return;
+
   // Marks
   Object.assign(state, {
-    focus:    [...(s.state.focus    || [])],
-    aperture: [...(s.state.aperture || [])],
-    zoom:     [...(s.state.zoom     || [])],
+    focus:    [...session.state.focus],
+    aperture: [...session.state.aperture],
+    zoom:     [...session.state.zoom],
   });
   // Active ring checkboxes
   ['focus', 'aperture', 'zoom'].forEach(t => {
     const chk = document.getElementById(`chk-${t}`);
-    chk.checked = s.activeRings ? s.activeRings[t] !== false : true;
+    chk.checked = session.activeRings[t] !== false;
     document.getElementById(`sec-${t}`).style.opacity = chk.checked ? '1' : '0.35';
   });
   // Options & layout
-  if (s.focusUnit)   setFocusUnit(s.focusUnit);
-  if (s.stopType)    setStopType(s.stopType);
-  if (s.layout)      setLayout(s.layout);
-  const savedGap = parseInt(s.focusInfinityGap, 10);
+  if (session.focusUnit)   setFocusUnit(session.focusUnit);
+  if (session.stopType)    setStopType(session.stopType);
+  if (session.layout)      setLayout(session.layout);
+  const savedGap = parseInt(session.focusInfinityGap, 10);
   focusInfinityGap = isNaN(savedGap) ? 5 : clamp(savedGap, 5, 50);
   _syncFocusInfinityInput();
-  startAngleDeg = s.startAngleDeg ?? 135;
-  sweepDeg      = s.sweepDeg      ?? 270;
-  if (s.ringDirection) setDirection(s.ringDirection);
+  startAngleDeg = session.startAngleDeg ?? 135;
+  sweepDeg      = session.sweepDeg      ?? 270;
+  if (session.ringDirection) setDirection(session.ringDirection);
   _syncAngleInputs();
   // Re-render tags
   ['focus', 'aperture', 'zoom'].forEach(t => renderTags(t));
@@ -1278,7 +1334,7 @@ function saveSession() {
   const sessions = _loadSessions();
   // Overwrite existing session with same name, otherwise append
   const idx = sessions.findIndex(s => s.name === name);
-  const entry = { name, ..._captureState() };
+  const entry = _sanitizeSessionEntry({ name, ..._captureState() });
   if (idx >= 0) sessions[idx] = entry;
   else sessions.push(entry);
   _saveSessions(sessions);
@@ -1343,7 +1399,9 @@ function exportSessions() {
   const link     = document.createElement('a');
   link.download  = 'lens-ring-sessions.json';
   link.href      = url;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -1355,13 +1413,15 @@ function importSessions(input) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
+      if (imported.length > MAX_IMPORTED_SESSIONS) throw new Error('Too many sessions');
       const existing = _loadSessions();
       // Merge: imported entries overwrite existing ones with the same name
       imported.forEach(entry => {
-        if (!entry.name || !entry.state) return;
-        const idx = existing.findIndex(s => s.name === entry.name);
-        if (idx >= 0) existing[idx] = entry;
-        else existing.push(entry);
+        const sanitized = _sanitizeSessionEntry(entry);
+        if (!sanitized) return;
+        const idx = existing.findIndex(s => s.name === sanitized.name);
+        if (idx >= 0) existing[idx] = sanitized;
+        else existing.push(sanitized);
       });
       _saveSessions(existing);
       renderSessionList();
