@@ -320,12 +320,12 @@
     <button class="layout-btn"        id="btn-tstop" onclick="setStopType('t')">T-stop</button>
   </div>
   <div class="control-row">
-    <label for="inp-focus-inf-pull" title="Pull the last finite focus mark closer to infinity when an ∞ mark exists">
-      ∞ spacing:
+    <label for="inp-focus-inf-gap" title="Adjust the gap between the last finite focus mark and infinity when an ∞ mark exists">
+      ∞ gap:
     </label>
-    <input type="range" id="inp-focus-inf-pull" min="5" max="95" step="5" value="75"
-           oninput="setFocusInfinityPull(this.value)" />
-    <span id="lbl-focus-inf-pull" style="font-size:0.75rem;color:#666;">75% pull toward ∞</span>
+    <input type="range" id="inp-focus-inf-gap" min="5" max="95" step="5" value="5"
+           oninput="setFocusInfinityGap(this.value)" />
+    <span id="lbl-focus-inf-gap" style="font-size:0.75rem;color:#666;">5% gap before ∞</span>
   </div>
 </div>
 
@@ -382,7 +382,7 @@ const state = {
 let layout       = 'linear'; // 'linear' | 'circular'
 let focusUnit    = 'metric'; // 'metric' | 'feet'
 let stopType     = 'f';      // 'f' | 't'
-let focusInfinityPull = 75;  // 5–95%: 100% would overlap ∞ with the last finite mark
+let focusInfinityGap = 5;    // 5–95%: 0% would overlap ∞ with the last finite mark
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
@@ -639,13 +639,13 @@ function setStopType(type) {
 }
 
 function _syncFocusInfinityInput() {
-  document.getElementById('inp-focus-inf-pull').value = focusInfinityPull;
-  document.getElementById('lbl-focus-inf-pull').textContent = `${focusInfinityPull}% pull toward ∞`;
+  document.getElementById('inp-focus-inf-gap').value = focusInfinityGap;
+  document.getElementById('lbl-focus-inf-gap').textContent = `${focusInfinityGap}% gap before ∞`;
 }
 
-function setFocusInfinityPull(val) {
+function setFocusInfinityGap(val) {
   const n = clamp(parseInt(val, 10), 5, 95);
-  focusInfinityPull = isNaN(n) ? 75 : n;
+  focusInfinityGap = isNaN(n) ? 5 : n;
   _syncFocusInfinityInput();
   drawAll();
 }
@@ -950,7 +950,7 @@ function diopterScaleT(marks) {
   const minFinite = Math.min(...finiteDiopters);
   const hasInfinity = sanitized.some(v => !isFinite(v));
   // Keep the proxy below the last finite diopter so ∞ never overlaps it.
-  const lo = hasInfinity ? minFinite * (focusInfinityPull / 100) : minFinite;
+  const lo = hasInfinity ? minFinite * (1 - focusInfinityGap / 100) : minFinite;
   const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : lo));
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
