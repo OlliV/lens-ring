@@ -1226,6 +1226,7 @@ function _captureState() {
     layout,
     focusUnit,
     stopType,
+    focusInfinityGap,
     startAngleDeg,
     sweepDeg,
     ringDirection,
@@ -1254,6 +1255,9 @@ function _applyState(s) {
   if (s.focusUnit)   setFocusUnit(s.focusUnit);
   if (s.stopType)    setStopType(s.stopType);
   if (s.layout)      setLayout(s.layout);
+  const savedGap = parseInt(s.focusInfinityGap, 10);
+  focusInfinityGap = isNaN(savedGap) ? 5 : clamp(savedGap, 5, 50);
+  _syncFocusInfinityInput();
   startAngleDeg = s.startAngleDeg ?? 135;
   sweepDeg      = s.sweepDeg      ?? 270;
   if (s.ringDirection) setDirection(s.ringDirection);
