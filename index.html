@@ -644,8 +644,8 @@ function _syncFocusInfinityInput() {
 }
 
 function setFocusInfinityGap(val) {
-  const n = clamp(parseInt(val, 10), 5, 50);
-  focusInfinityGap = isNaN(n) ? 5 : n;
+  const parsed = parseInt(val, 10);
+  focusInfinityGap = isNaN(parsed) ? 5 : clamp(parsed, 5, 50);
   _syncFocusInfinityInput();
   drawAll();
 }
@@ -953,7 +953,10 @@ function diopterScaleT(marks) {
   const lo = Math.min(...finiteDiopters);
 
   if (hi === lo) {
-    return sanitized.map(v => (!isFinite(v) ? (hasExplicitInfinity ? 1 : 0.5) : hasExplicitInfinity ? maxFiniteT / 2 : 0.5));
+    return sanitized.map(v => {
+      if (!isFinite(v)) return hasExplicitInfinity ? 1 : 0.5;
+      return hasExplicitInfinity ? maxFiniteT / 2 : 0.5;
+    });
   }
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
