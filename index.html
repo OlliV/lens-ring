@@ -1229,6 +1229,7 @@ function _encodeSessionMarks(type, values) {
 function _decodeSessionMarks(type, values) {
   if (!Array.isArray(values)) return [];
   return values
+    // Legacy saved focus sessions serialized Infinity as null via JSON.stringify.
     .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === null) ? Infinity : v))
     // Imported strings and other malformed values are intentionally dropped here.
     .filter(v => typeof v === 'number' && (type === 'focus' ? (v === Infinity || (isFinite(v) && v > 0)) : (isFinite(v) && v > 0)));
@@ -1413,7 +1414,6 @@ function importSessions(input) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
-      if (imported.length > MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions in file (max ${MAX_IMPORTED_SESSIONS})`);
       const merged = [..._loadSessions()];
       // Merge: imported entries overwrite existing ones with the same name
       imported.forEach(entry => {
