@@ -497,6 +497,7 @@ function isLightHex(hex) {
   const b = parseInt(expanded.slice(4, 6), 16);
   return (r * 299 + g * 587 + b * 114) / 1000 >= 186;
 }
+const CANVAS_IS_LIGHT = isLightHex(CANVAS_BG);
 
 // Metres → feet+inches string, e.g. 0.5 → "1′7.7″", 0.3 → "11.8″"
 function metresToFeetStr(m) {
@@ -955,7 +956,7 @@ function drawCircularRings(types, CW, CH) {
 
         ctx.save();
         ctx.font = '11px "Segoe UI", system-ui, sans-serif';
-        ctx.fillStyle = isLightHex(CANVAS_BG) ? '#000' : col.text;
+        ctx.fillStyle = CANVAS_IS_LIGHT ? '#000' : col.text;
         ctx.textBaseline = 'middle';
         ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
         ctx.fillText(FORMATTERS[type](val), lx, ly);
