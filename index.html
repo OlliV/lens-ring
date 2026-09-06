@@ -324,7 +324,7 @@
       Infinity gap:
     </label>
     <input type="range" id="inp-focus-inf-gap" min="5" max="50" step="5" value="5"
-           aria-label="Gap before infinity mark (percent)"
+           aria-describedby="lbl-focus-inf-gap"
            oninput="setFocusInfinityGap(this.value)" />
     <span id="lbl-focus-inf-gap" style="font-size:0.75rem;color:#666;">5% gap before ∞</span>
   </div>
@@ -941,7 +941,7 @@ function drawCircularRings(types, CW, CH) {
 function diopterScaleT(marks) {
   if (marks.length === 0) return [];
 
-  const hasExplicitInfinity = marks.some(v => !isFinite(v));
+  const hasExplicitInfinity = marks.some(v => v === Infinity);
 
   // Focus input rejects non-positive values; if malformed data still appears,
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
