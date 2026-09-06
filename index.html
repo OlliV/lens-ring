@@ -1416,14 +1416,16 @@ function importSessions(input) {
       if (!Array.isArray(imported)) throw new Error('Expected an array');
       const merged = [..._loadSessions()];
       // Merge: imported entries overwrite existing ones with the same name
-      imported.forEach(entry => {
+      for (const entry of imported) {
         const sanitized = _sanitizeSessionEntry(entry);
-        if (!sanitized) return;
+        if (!sanitized) continue;
         const idx = merged.findIndex(s => s.name === sanitized.name);
         if (idx >= 0) merged[idx] = sanitized;
-        else merged.push(sanitized);
-      });
-      if (merged.length > MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions (max ${MAX_IMPORTED_SESSIONS})`);
+        else {
+          if (merged.length >= MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions (max ${MAX_IMPORTED_SESSIONS})`);
+          merged.push(sanitized);
+        }
+      }
       _saveSessions(merged);
       renderSessionList();
     } catch (err) {
