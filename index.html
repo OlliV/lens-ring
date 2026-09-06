@@ -323,7 +323,7 @@
     <label for="inp-focus-inf-gap" title="Adjust the gap between the last finite focus mark and infinity when an ∞ mark exists">
       ∞ gap:
     </label>
-    <input type="range" id="inp-focus-inf-gap" min="5" max="95" step="5" value="5"
+    <input type="range" id="inp-focus-inf-gap" min="5" max="50" step="5" value="5"
            oninput="setFocusInfinityGap(this.value)" />
     <span id="lbl-focus-inf-gap" style="font-size:0.75rem;color:#666;">5% gap before ∞</span>
   </div>
@@ -382,7 +382,7 @@ const state = {
 let layout       = 'linear'; // 'linear' | 'circular'
 let focusUnit    = 'metric'; // 'metric' | 'feet'
 let stopType     = 'f';      // 'f' | 't'
-let focusInfinityGap = 5;    // 5–95%: 0% would overlap ∞ with the last finite mark
+let focusInfinityGap = 5;    // 5–50%: keep a visible finite range while reserving a gap before ∞
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
@@ -644,7 +644,7 @@ function _syncFocusInfinityInput() {
 }
 
 function setFocusInfinityGap(val) {
-  const n = clamp(parseInt(val, 10), 5, 95);
+  const n = clamp(parseInt(val, 10), 5, 50);
   focusInfinityGap = isNaN(n) ? 5 : n;
   _syncFocusInfinityInput();
   drawAll();
@@ -945,12 +945,12 @@ function diopterScaleT(marks) {
   if (finiteDiopters.length === 0) return marks.map(() => 1);
 
   const hasInfinity = sanitized.some(v => !isFinite(v));
-  const maxFiniteT = hasInfinity ? 1 - focusInfinityGap / 100 : 1;
+  const maxFiniteT = hasInfinity ? clamp(1 - focusInfinityGap / 100, 0.5, 0.95) : 1;
   const hi = Math.max(...finiteDiopters);
   const lo = Math.min(...finiteDiopters);
 
   if (hi === lo) {
-    return sanitized.map(v => (!isFinite(v) ? 1 : hasInfinity ? maxFiniteT : 0.5));
+    return sanitized.map(v => (!isFinite(v) ? 1 : 0.5));
   }
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
