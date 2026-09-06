@@ -1314,8 +1314,8 @@ function _applyState(s) {
   if (session.layout)      setLayout(session.layout);
   focusInfinityGap = session.focusInfinityGap ?? focusInfinityGap;
   _syncFocusInfinityInput();
-  startAngleDeg = session.startAngleDeg ?? 135;
-  sweepDeg      = session.sweepDeg      ?? 270;
+  startAngleDeg = session.startAngleDeg ?? startAngleDeg;
+  sweepDeg      = session.sweepDeg      ?? sweepDeg;
   if (session.ringDirection) setDirection(session.ringDirection);
   _syncAngleInputs();
   // Re-render tags
@@ -1413,7 +1413,7 @@ function importSessions(input) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
-      if (imported.length > MAX_IMPORTED_SESSIONS) throw new Error('Too many sessions');
+      if (imported.length > MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions in file (max ${MAX_IMPORTED_SESSIONS})`);
       const merged = [..._loadSessions()];
       // Merge: imported entries overwrite existing ones with the same name
       imported.forEach(entry => {
