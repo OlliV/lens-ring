@@ -1230,7 +1230,7 @@ function _decodeSessionMarks(type, values) {
   if (!Array.isArray(values)) return [];
   return values
     .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === null) ? Infinity : v))
-    .filter(v => typeof v === 'number' && (type === 'focus' ? (v > 0 || !isFinite(v)) : (isFinite(v) && v > 0)));
+    .filter(v => typeof v === 'number' && (type === 'focus' ? (v === Infinity || (isFinite(v) && v > 0)) : (isFinite(v) && v > 0)));
 }
 
 function _sanitizeSessionEntry(entry) {
@@ -1423,10 +1423,11 @@ function importSessions(input) {
         if (idx >= 0) existing[idx] = sanitized;
         else existing.push(sanitized);
       });
+      if (existing.length > MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions (max ${MAX_IMPORTED_SESSIONS})`);
       _saveSessions(existing);
       renderSessionList();
-    } catch {
-      alert('Failed to import: invalid JSON file.');
+    } catch (err) {
+      alert(`Failed to import: ${err.message || 'invalid JSON file.'}`);
     }
     // Reset the file input so the same file can be re-imported
     input.value = '';
