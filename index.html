@@ -1402,8 +1402,10 @@ function exportSessions() {
   link.href      = url;
   document.body.appendChild(link);
   link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1000);
 }
 
 function importSessions(input) {
@@ -1429,7 +1431,7 @@ function importSessions(input) {
       _saveSessions(merged);
       renderSessionList();
     } catch (err) {
-      alert(`Failed to import: ${err.message || 'invalid JSON file.'}`);
+      alert(`Failed to import: ${err.message || 'Invalid JSON file.'}`);
     }
     // Reset the file input so the same file can be re-imported
     input.value = '';
