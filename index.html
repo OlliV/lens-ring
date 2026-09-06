@@ -1419,6 +1419,7 @@ function importSessions(input) {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
       const merged = [..._loadSessions()];
+      let hitSessionCap = false;
       // Merge: imported entries overwrite existing ones with the same name
       for (const entry of imported) {
         const sanitized = _sanitizeSessionEntry(entry);
@@ -1426,12 +1427,16 @@ function importSessions(input) {
         const idx = merged.findIndex(s => s.name === sanitized.name);
         if (idx >= 0) merged[idx] = sanitized;
         else {
-          if (merged.length >= MAX_SESSIONS) throw new Error(`Too many saved sessions (max ${MAX_SESSIONS})`);
+          if (merged.length >= MAX_SESSIONS) {
+            hitSessionCap = true;
+            break;
+          }
           merged.push(sanitized);
         }
       }
       _saveSessions(merged);
       renderSessionList();
+      if (hitSessionCap) alert(`Imported up to the saved-session limit (${MAX_SESSIONS}).`);
     } catch (err) {
       alert(`Failed to import: ${err.message || 'Invalid JSON file.'}`);
     }
