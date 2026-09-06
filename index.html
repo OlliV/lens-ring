@@ -938,19 +938,20 @@ function drawCircularRings(types, CW, CH) {
    Aperture and zoom keep the existing log-like spacing.
    ========================================================= */
 function diopterScaleT(marks) {
+  const hasExplicitInfinity = marks.some(v => !isFinite(v));
+
   // Focus input rejects non-positive values; if malformed data still appears,
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
   const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
-  if (finiteDiopters.length === 0) return marks.map(() => 1);
+  if (finiteDiopters.length === 0) return marks.map(() => (hasExplicitInfinity ? 1 : 0.5));
 
-  const hasInfinity = sanitized.some(v => !isFinite(v));
-  const maxFiniteT = hasInfinity ? clamp(1 - focusInfinityGap / 100, 0.5, 0.95) : 1;
+  const maxFiniteT = hasExplicitInfinity ? clamp(1 - focusInfinityGap / 100, 0.5, 0.95) : 1;
   const hi = Math.max(...finiteDiopters);
   const lo = Math.min(...finiteDiopters);
 
   if (hi === lo) {
-    return sanitized.map(v => (!isFinite(v) ? 1 : 0.5));
+    return sanitized.map(v => (!isFinite(v) ? (hasExplicitInfinity ? 1 : 0.5) : 0.5));
   }
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
