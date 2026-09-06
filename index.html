@@ -953,11 +953,11 @@ function diopterScaleT(marks) {
   const lo = Math.min(...finiteDiopters);
 
   if (hi === lo) {
-    return sanitized.map(v => (!isFinite(v) ? (hasExplicitInfinity ? 1 : 0.5) : hasExplicitInfinity ? 0 : 0.5));
+    return sanitized.map(v => (!isFinite(v) ? (hasExplicitInfinity ? 1 : 0.5) : hasExplicitInfinity ? maxFiniteT / 2 : 0.5));
   }
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
-  // When ∞ exists, reserve the configured gap at the far end (t = 1).
+  // When ∞ exists, reserve the configured gap only at the far end (t = 1).
   return sanitized.map(v => {
     if (!isFinite(v)) return 1;
     const diopter = 1 / v;
