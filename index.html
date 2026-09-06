@@ -1210,8 +1210,9 @@ function exportCanvas(format) {
    Sessions — local storage persistence
    ========================================================= */
 const SESSIONS_KEY = 'lens-ring-sessions';
-const MAX_IMPORTED_SESSIONS = 100;
-const SESSION_INFINITY = '__INF__';
+const MAX_SESSIONS = 100;
+const SESSION_INFINITY = 'Infinity';
+const LEGACY_SESSION_INFINITY = '__INF__';
 
 function _loadSessions() {
   try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; }
@@ -1229,8 +1230,9 @@ function _encodeSessionMarks(type, values) {
 function _decodeSessionMarks(type, values) {
   if (!Array.isArray(values)) return [];
   return values
-    // Legacy saved focus sessions serialized Infinity as null via JSON.stringify.
-    .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === null) ? Infinity : v))
+    // Exported focus sessions use the readable "Infinity" token; older saves used
+    // "__INF__" or null when JSON.stringify serialized Infinity directly.
+    .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === LEGACY_SESSION_INFINITY || v === null) ? Infinity : v))
     // Imported strings and other malformed values are intentionally dropped here.
     .filter(v => typeof v === 'number' && (type === 'focus' ? (v === Infinity || (isFinite(v) && v > 0)) : (isFinite(v) && v > 0)));
 }
@@ -1417,6 +1419,7 @@ function importSessions(input) {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
       const merged = [..._loadSessions()];
+      if (merged.length > MAX_SESSIONS) throw new Error(`Too many saved sessions (max ${MAX_SESSIONS})`);
       // Merge: imported entries overwrite existing ones with the same name
       for (const entry of imported) {
         const sanitized = _sanitizeSessionEntry(entry);
@@ -1424,7 +1427,7 @@ function importSessions(input) {
         const idx = merged.findIndex(s => s.name === sanitized.name);
         if (idx >= 0) merged[idx] = sanitized;
         else {
-          if (merged.length >= MAX_IMPORTED_SESSIONS) throw new Error(`Too many sessions (max ${MAX_IMPORTED_SESSIONS})`);
+          if (merged.length >= MAX_SESSIONS) throw new Error(`Too many saved sessions (max ${MAX_SESSIONS})`);
           merged.push(sanitized);
         }
       }
