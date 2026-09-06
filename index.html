@@ -1419,7 +1419,7 @@ function importSessions(input) {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
       const merged = [..._loadSessions()];
-      if (merged.length > MAX_SESSIONS) throw new Error(`Too many saved sessions (max ${MAX_SESSIONS})`);
+      if (merged.length >= MAX_SESSIONS) throw new Error(`Too many saved sessions (max ${MAX_SESSIONS})`);
       // Merge: imported entries overwrite existing ones with the same name
       for (const entry of imported) {
         const sanitized = _sanitizeSessionEntry(entry);
