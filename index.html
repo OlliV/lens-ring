@@ -241,6 +241,65 @@
     @media (max-width: 520px) {
       .marks-grid { grid-template-columns: 1fr; }
     }
+
+    /* Sessions */
+    .session-save-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .session-save-row input[type=text] {
+      flex: 1;
+      min-width: 140px;
+      background: #333;
+      border: 1px solid #444;
+      border-radius: 6px;
+      color: #e0e0e0;
+      padding: 5px 8px;
+      font-size: 0.88rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .session-save-row input[type=text]:focus { border-color: #4ea8ff; }
+    .session-save-row input[type=text].invalid { border-color: #ff4e4e; }
+
+    .session-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #2e2e2e;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    .session-item .session-name {
+      flex: 1;
+      font-size: 0.88rem;
+      color: #d0d0d0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .session-empty {
+      font-size: 0.82rem;
+      color: #555;
+      font-style: italic;
+    }
+
+    .import-input { display: none; }
   </style>
 </head>
 <body>
@@ -367,6 +426,22 @@
   <div class="export-row">
     <button class="btn primary" onclick="exportCanvas('png')">⬇ Download PNG</button>
     <button class="btn primary" onclick="exportCanvas('jpeg')">⬇ Download JPEG</button>
+  </div>
+</div>
+
+<!-- Sessions -->
+<div class="panel">
+  <h2>Sessions</h2>
+  <div class="session-save-row">
+    <input type="text" id="inp-session-name" placeholder="Session name…" />
+    <button class="btn primary" onclick="saveSession()">💾 Save</button>
+  </div>
+  <div class="session-list" id="session-list"></div>
+  <div class="export-row">
+    <button class="btn" onclick="exportSessions()">⬆ Export JSON</button>
+    <button class="btn" onclick="document.getElementById('inp-import').click()">⬇ Import JSON</button>
+    <input class="import-input" type="file" id="inp-import" accept=".json,application/json"
+           onchange="importSessions(this)" />
   </div>
 </div>
 
@@ -531,6 +606,10 @@ function renderTags(type) {
   document.getElementById(`inp-${type}`).addEventListener('keydown', e => {
     if (e.key === 'Enter') addMark(type);
   });
+});
+
+document.getElementById('inp-session-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveSession();
 });
 
 /* =========================================================
@@ -1128,6 +1207,170 @@ function exportCanvas(format) {
 });
 
 /* =========================================================
+   Sessions — local storage persistence
+   ========================================================= */
+const SESSIONS_KEY = 'lens-ring-sessions';
+
+function _loadSessions() {
+  try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; }
+  catch { return []; }
+}
+
+function _saveSessions(sessions) {
+  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
+}
+
+function _captureState() {
+  return {
+    state:         { focus: [...state.focus], aperture: [...state.aperture], zoom: [...state.zoom] },
+    layout,
+    focusUnit,
+    stopType,
+    startAngleDeg,
+    sweepDeg,
+    ringDirection,
+    activeRings: {
+      focus:    document.getElementById('chk-focus').checked,
+      aperture: document.getElementById('chk-aperture').checked,
+      zoom:     document.getElementById('chk-zoom').checked,
+    },
+  };
+}
+
+function _applyState(s) {
+  // Marks
+  Object.assign(state, {
+    focus:    [...(s.state.focus    || [])],
+    aperture: [...(s.state.aperture || [])],
+    zoom:     [...(s.state.zoom     || [])],
+  });
+  // Active ring checkboxes
+  ['focus', 'aperture', 'zoom'].forEach(t => {
+    const chk = document.getElementById(`chk-${t}`);
+    chk.checked = s.activeRings ? s.activeRings[t] !== false : true;
+    document.getElementById(`sec-${t}`).style.opacity = chk.checked ? '1' : '0.35';
+  });
+  // Options & layout
+  if (s.focusUnit)   setFocusUnit(s.focusUnit);
+  if (s.stopType)    setStopType(s.stopType);
+  if (s.layout)      setLayout(s.layout);
+  startAngleDeg = s.startAngleDeg ?? 135;
+  sweepDeg      = s.sweepDeg      ?? 270;
+  if (s.ringDirection) setDirection(s.ringDirection);
+  _syncAngleInputs();
+  // Re-render tags
+  ['focus', 'aperture', 'zoom'].forEach(t => renderTags(t));
+  drawAll();
+}
+
+function saveSession() {
+  const inp  = document.getElementById('inp-session-name');
+  const name = inp.value.trim();
+  if (!name) {
+    inp.classList.add('invalid');
+    setTimeout(() => inp.classList.remove('invalid'), 1200);
+    return;
+  }
+  const sessions = _loadSessions();
+  // Overwrite existing session with same name, otherwise append
+  const idx = sessions.findIndex(s => s.name === name);
+  const entry = { name, ..._captureState() };
+  if (idx >= 0) sessions[idx] = entry;
+  else sessions.push(entry);
+  _saveSessions(sessions);
+  inp.value = '';
+  renderSessionList();
+}
+
+function loadSession(name) {
+  const sessions = _loadSessions();
+  const session  = sessions.find(s => s.name === name);
+  if (session) _applyState(session);
+}
+
+function deleteSession(name) {
+  const sessions = _loadSessions().filter(s => s.name !== name);
+  _saveSessions(sessions);
+  renderSessionList();
+}
+
+function renderSessionList() {
+  const container = document.getElementById('session-list');
+  const sessions  = _loadSessions();
+  container.innerHTML = '';
+  if (sessions.length === 0) {
+    const p = document.createElement('p');
+    p.className = 'session-empty';
+    p.textContent = 'No saved sessions yet.';
+    container.appendChild(p);
+    return;
+  }
+  sessions.forEach(({ name }) => {
+    const item = document.createElement('div');
+    item.className = 'session-item';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'session-name';
+    nameEl.textContent = name;
+
+    const loadBtn = document.createElement('button');
+    loadBtn.className = 'btn primary';
+    loadBtn.textContent = '↩ Load';
+    loadBtn.addEventListener('click', () => loadSession(name));
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn';
+    delBtn.textContent = '🗑 Delete';
+    delBtn.style.color = '#ff6b6b';
+    delBtn.addEventListener('click', () => deleteSession(name));
+
+    item.appendChild(nameEl);
+    item.appendChild(loadBtn);
+    item.appendChild(delBtn);
+    container.appendChild(item);
+  });
+}
+
+function exportSessions() {
+  const sessions = _loadSessions();
+  const json     = JSON.stringify(sessions, null, 2);
+  const blob     = new Blob([json], { type: 'application/json' });
+  const url      = URL.createObjectURL(blob);
+  const link     = document.createElement('a');
+  link.download  = 'lens-ring-sessions.json';
+  link.href      = url;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function importSessions(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) throw new Error('Expected an array');
+      const existing = _loadSessions();
+      // Merge: imported entries overwrite existing ones with the same name
+      imported.forEach(entry => {
+        if (!entry.name || !entry.state) return;
+        const idx = existing.findIndex(s => s.name === entry.name);
+        if (idx >= 0) existing[idx] = entry;
+        else existing.push(entry);
+      });
+      _saveSessions(existing);
+      renderSessionList();
+    } catch {
+      alert('Failed to import: invalid JSON file.');
+    }
+    // Reset the file input so the same file can be re-imported
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+
+/* =========================================================
    Bootstrap: load defaults and draw
    ========================================================= */
 (function init() {
@@ -1138,6 +1381,7 @@ function exportCanvas(format) {
   _syncFocusInfinityInput();
   _syncAngleInputs();
   drawAll();
+  renderSessionList();
 })();
 </script>
 </body>
