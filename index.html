@@ -160,7 +160,7 @@
       display: block;
       width: 100%;
       border-radius: 12px;
-      background: #111;
+      background: #fff;
     }
 
     /* Layout toggle */
@@ -480,11 +480,24 @@ const COLORS = {
   aperture: { ring: '#ff9f4e', text: '#ffd8b0', bg: '#3a2000' },
   zoom:     { ring: '#6adf7e', text: '#c0f5c8', bg: '#0a2d12' },
 };
+const CANVAS_BG = '#fff';
 
 /* =========================================================
    Helpers
    ========================================================= */
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+function isLightHex(hex) {
+  const clean = hex.trim().replace('#', '');
+  const expanded = clean.length === 3
+    ? clean.split('').map(ch => ch + ch).join('')
+    : clean;
+  if (!/^[\da-fA-F]{6}$/.test(expanded)) return false;
+  const r = parseInt(expanded.slice(0, 2), 16);
+  const g = parseInt(expanded.slice(2, 4), 16);
+  const b = parseInt(expanded.slice(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 186;
+}
+const CANVAS_IS_LIGHT = isLightHex(CANVAS_BG);
 
 // Metres → feet+inches string, e.g. 0.5 → "1′7.7″", 0.3 → "11.8″"
 function metresToFeetStr(m) {
@@ -734,7 +747,7 @@ function drawAll() {
   const CW = canvas.width;
   const CH = canvas.height;
   ctx.clearRect(0, 0, CW, CH);
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = CANVAS_BG;
   ctx.fillRect(0, 0, CW, CH);
 
   const types = getActiveTypes();
@@ -943,7 +956,7 @@ function drawCircularRings(types, CW, CH) {
 
         ctx.save();
         ctx.font = '11px "Segoe UI", system-ui, sans-serif';
-        ctx.fillStyle = col.text;
+        ctx.fillStyle = CANVAS_IS_LIGHT && ringIdx === 0 ? '#000' : col.text;
         ctx.textBaseline = 'middle';
         ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
         ctx.fillText(FORMATTERS[type](val), lx, ly);
