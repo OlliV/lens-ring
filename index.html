@@ -200,6 +200,11 @@
 
     .control-row input[type=number]:focus { border-color: #4ea8ff; }
 
+    .control-row input[type=range] {
+      width: 180px;
+      accent-color: #4ea8ff;
+    }
+
     .layout-btn {
       background: #3a3a3a;
       border: 1px solid #555;
@@ -373,6 +378,15 @@
     <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
     <button class="layout-btn"        id="btn-tstop" onclick="setStopType('t')">T-stop</button>
   </div>
+  <div class="control-row">
+    <label for="inp-focus-inf-gap" title="Adjust the gap between the last finite focus mark and infinity when an ∞ mark exists">
+      Infinity gap:
+    </label>
+    <input type="range" id="inp-focus-inf-gap" min="5" max="50" step="5" value="5"
+           aria-describedby="lbl-focus-inf-gap"
+           oninput="setFocusInfinityGap(this.value)" />
+    <span id="lbl-focus-inf-gap" style="font-size:0.75rem;color:#666;">5% gap before ∞</span>
+  </div>
 </div>
 
 <!-- Layout toggle -->
@@ -444,6 +458,7 @@ const state = {
 let layout       = 'linear'; // 'linear' | 'circular'
 let focusUnit    = 'metric'; // 'metric' | 'feet'
 let stopType     = 'f';      // 'f' | 't'
+let focusInfinityGap = 5;    // 5–50%: keep a visible finite range while reserving a gap before ∞
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
@@ -703,6 +718,18 @@ function setStopType(type) {
   drawAll();
 }
 
+function _syncFocusInfinityInput() {
+  document.getElementById('inp-focus-inf-gap').value = focusInfinityGap;
+  document.getElementById('lbl-focus-inf-gap').textContent = `${focusInfinityGap}% gap before ∞`;
+}
+
+function setFocusInfinityGap(val) {
+  const parsed = parseInt(val, 10);
+  focusInfinityGap = isNaN(parsed) ? 5 : clamp(parsed, 5, 50);
+  _syncFocusInfinityInput();
+  drawAll();
+}
+
 function drawAll() {
   const CW = canvas.width;
   const CH = canvas.height;
@@ -771,9 +798,9 @@ function drawRing(type, y, h, marks) {
     return;
   }
 
-  /* Map value → x position using a log-like scale.
+  /* Map value → x position using the type-specific scale.
      When direction is CCW, mirror the positions so the rail reads right-to-left. */
-  const rawPositions = computePositions(marks, rx, rx + rw);
+  const rawPositions = computePositions(type, marks, rx, rx + rw);
   const positions = ringDirection === 'ccw'
     ? rawPositions.map(x => rx + rw - (x - rx))
     : rawPositions;
@@ -884,7 +911,7 @@ function drawCircularRings(types, CW, CH) {
 
     /* Marks */
     if (marks.length > 0) {
-      const angles = computeAngles(marks, START_RAD, END_RAD);
+      const angles = computeAngles(type, marks, START_RAD, END_RAD);
       const tickIn  = innerRing;
       const tickOut = outerRing;
 
@@ -985,10 +1012,44 @@ function drawCircularRings(types, CW, CH) {
 }
 
 /* =========================================================
-   Shared log-scale mapping utility
-   Returns an array of t values in [0, 1] for each mark.
-   Infinity is proxied as 4× the max finite value.
+   Shared scale mapping utilities
+   Focus marks use a diopter scale (1 / distance), which is the
+   common optics-friendly way to make marks bunch up towards ∞.
+   Aperture and zoom keep the existing log-like spacing.
    ========================================================= */
+function diopterScaleT(marks) {
+  if (marks.length === 0) return [];
+
+  const hasExplicitInfinity = marks.some(v => v === Infinity);
+
+  // Focus input rejects non-positive values; if malformed data still appears,
+  // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
+  const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
+  const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
+  // With only ∞-like values left, keep explicit ∞ marks at the far end while
+  // malformed non-positive fallback data stays centred instead of reserving a gap.
+  if (finiteDiopters.length === 0) return marks.map(() => (hasExplicitInfinity ? 1 : 0.5));
+
+  const maxFiniteT = hasExplicitInfinity ? clamp(1 - focusInfinityGap / 100, 0.5, 0.95) : 1;
+  const hi = Math.max(...finiteDiopters);
+  const lo = Math.min(...finiteDiopters);
+
+  if (hi === lo) {
+    return sanitized.map(v => {
+      if (!isFinite(v)) return hasExplicitInfinity ? 1 : 0.5;
+      return hasExplicitInfinity ? maxFiniteT / 2 : 0.5;
+    });
+  }
+
+  // Highest diopter = closest focus = start of the rail/arc (t = 0).
+  // When ∞ exists, reserve the configured gap only at the far end (t = 1).
+  return sanitized.map(v => {
+    if (!isFinite(v)) return 1;
+    const diopter = 1 / v;
+    return ((hi - diopter) / (hi - lo)) * maxFiniteT;
+  });
+}
+
 function logScaleT(marks) {
   if (marks.length === 1) return [0.5];
 
@@ -1004,16 +1065,20 @@ function logScaleT(marks) {
   return raw.map(v => (hi === lo ? 0.5 : (Math.log(v + 1e-9) - lo) / (hi - lo)));
 }
 
-/* =========================================================
-   Position mapping (logarithmic scale for natural feel)
-   ========================================================= */
-function computePositions(marks, x0, x1) {
-  return logScaleT(marks).map(t => Math.round(x0 + t * (x1 - x0)));
+function scaleT(type, marks) {
+  return type === 'focus' ? diopterScaleT(marks) : logScaleT(marks);
 }
 
-/* Same log-scale mapping but onto an angular range [a0, a1] (radians) */
-function computeAngles(marks, a0, a1) {
-  return logScaleT(marks).map(t => a0 + t * (a1 - a0));
+/* =========================================================
+   Position mapping
+   ========================================================= */
+function computePositions(type, marks, x0, x1) {
+  return scaleT(type, marks).map(t => Math.round(x0 + t * (x1 - x0)));
+}
+
+/* Same scale mapping but onto an angular range [a0, a1] (radians) */
+function computeAngles(type, marks, a0, a1) {
+  return scaleT(type, marks).map(t => a0 + t * (a1 - a0));
 }
 
 /* =========================================================
@@ -1145,6 +1210,9 @@ function exportCanvas(format) {
    Sessions — local storage persistence
    ========================================================= */
 const SESSIONS_KEY = 'lens-ring-sessions';
+const MAX_SESSIONS = 100;
+const SESSION_INFINITY = 'Infinity';
+const LEGACY_SESSION_INFINITY = '__INF__';
 
 function _loadSessions() {
   try { return JSON.parse(localStorage.getItem(SESSIONS_KEY)) || []; }
@@ -1155,12 +1223,67 @@ function _saveSessions(sessions) {
   localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
 }
 
+function _encodeSessionMarks(type, values) {
+  return values.map(v => (type === 'focus' && !isFinite(v) ? SESSION_INFINITY : v));
+}
+
+function _decodeSessionMarks(type, values) {
+  if (!Array.isArray(values)) return [];
+  return values
+    // Exported focus sessions use the readable "Infinity" token; older saves used
+    // "__INF__" or null when JSON.stringify serialized Infinity directly.
+    .map(v => (type === 'focus' && (v === SESSION_INFINITY || v === LEGACY_SESSION_INFINITY || v === null) ? Infinity : v))
+    // Imported strings and other malformed values are intentionally dropped here.
+    .filter(v => typeof v === 'number' && (type === 'focus' ? (v === Infinity || (isFinite(v) && v > 0)) : (isFinite(v) && v > 0)));
+}
+
+function _sanitizeSessionEntry(entry) {
+  if (!entry || typeof entry !== 'object' || typeof entry.name !== 'string') return null;
+  const name = entry.name.trim();
+  if (!name || !entry.state || typeof entry.state !== 'object') return null;
+
+  const sanitized = {
+    name,
+    state: {
+      focus:    _decodeSessionMarks('focus', entry.state.focus),
+      aperture: _decodeSessionMarks('aperture', entry.state.aperture),
+      zoom:     _decodeSessionMarks('zoom', entry.state.zoom),
+    },
+    activeRings: {
+      focus:    entry.activeRings ? entry.activeRings.focus !== false : true,
+      aperture: entry.activeRings ? entry.activeRings.aperture !== false : true,
+      zoom:     entry.activeRings ? entry.activeRings.zoom !== false : true,
+    },
+  };
+
+  if (entry.layout === 'linear' || entry.layout === 'circular') sanitized.layout = entry.layout;
+  if (entry.focusUnit === 'metric' || entry.focusUnit === 'feet') sanitized.focusUnit = entry.focusUnit;
+  if (entry.stopType === 'f' || entry.stopType === 't') sanitized.stopType = entry.stopType;
+  if (entry.ringDirection === 'cw' || entry.ringDirection === 'ccw') sanitized.ringDirection = entry.ringDirection;
+
+  const parsedGap = parseInt(entry.focusInfinityGap, 10);
+  if (!isNaN(parsedGap)) sanitized.focusInfinityGap = clamp(parsedGap, 5, 50);
+
+  const parsedStart = parseInt(entry.startAngleDeg, 10);
+  if (!isNaN(parsedStart)) sanitized.startAngleDeg = ((parsedStart % 360) + 360) % 360;
+
+  const parsedSweep = parseInt(entry.sweepDeg, 10);
+  if (!isNaN(parsedSweep)) sanitized.sweepDeg = clamp(parsedSweep, 10, 350);
+
+  return sanitized;
+}
+
 function _captureState() {
   return {
-    state:         { focus: [...state.focus], aperture: [...state.aperture], zoom: [...state.zoom] },
+    state:         {
+      focus:    _encodeSessionMarks('focus', state.focus),
+      aperture: _encodeSessionMarks('aperture', state.aperture),
+      zoom:     _encodeSessionMarks('zoom', state.zoom),
+    },
     layout,
     focusUnit,
     stopType,
+    focusInfinityGap,
     startAngleDeg,
     sweepDeg,
     ringDirection,
@@ -1173,25 +1296,30 @@ function _captureState() {
 }
 
 function _applyState(s) {
+  const session = _sanitizeSessionEntry(s);
+  if (!session) return;
+
   // Marks
   Object.assign(state, {
-    focus:    [...(s.state.focus    || [])],
-    aperture: [...(s.state.aperture || [])],
-    zoom:     [...(s.state.zoom     || [])],
+    focus:    [...session.state.focus],
+    aperture: [...session.state.aperture],
+    zoom:     [...session.state.zoom],
   });
   // Active ring checkboxes
   ['focus', 'aperture', 'zoom'].forEach(t => {
     const chk = document.getElementById(`chk-${t}`);
-    chk.checked = s.activeRings ? s.activeRings[t] !== false : true;
+    chk.checked = session.activeRings[t] !== false;
     document.getElementById(`sec-${t}`).style.opacity = chk.checked ? '1' : '0.35';
   });
   // Options & layout
-  if (s.focusUnit)   setFocusUnit(s.focusUnit);
-  if (s.stopType)    setStopType(s.stopType);
-  if (s.layout)      setLayout(s.layout);
-  startAngleDeg = s.startAngleDeg ?? 135;
-  sweepDeg      = s.sweepDeg      ?? 270;
-  if (s.ringDirection) setDirection(s.ringDirection);
+  if (session.focusUnit)   setFocusUnit(session.focusUnit);
+  if (session.stopType)    setStopType(session.stopType);
+  if (session.layout)      setLayout(session.layout);
+  focusInfinityGap = session.focusInfinityGap ?? focusInfinityGap;
+  _syncFocusInfinityInput();
+  startAngleDeg = session.startAngleDeg ?? startAngleDeg;
+  sweepDeg      = session.sweepDeg      ?? sweepDeg;
+  if (session.ringDirection) setDirection(session.ringDirection);
   _syncAngleInputs();
   // Re-render tags
   ['focus', 'aperture', 'zoom'].forEach(t => renderTags(t));
@@ -1209,9 +1337,15 @@ function saveSession() {
   const sessions = _loadSessions();
   // Overwrite existing session with same name, otherwise append
   const idx = sessions.findIndex(s => s.name === name);
-  const entry = { name, ..._captureState() };
+  const entry = _sanitizeSessionEntry({ name, ..._captureState() });
   if (idx >= 0) sessions[idx] = entry;
-  else sessions.push(entry);
+  else {
+    if (sessions.length >= MAX_SESSIONS) {
+      alert(`Saved-session limit reached (${MAX_SESSIONS}). Delete one before saving a new name.`);
+      return;
+    }
+    sessions.push(entry);
+  }
   _saveSessions(sessions);
   inp.value = '';
   renderSessionList();
@@ -1274,8 +1408,12 @@ function exportSessions() {
   const link     = document.createElement('a');
   link.download  = 'lens-ring-sessions.json';
   link.href      = url;
+  document.body.appendChild(link);
   link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  requestAnimationFrame(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  });
 }
 
 function importSessions(input) {
@@ -1286,18 +1424,27 @@ function importSessions(input) {
     try {
       const imported = JSON.parse(e.target.result);
       if (!Array.isArray(imported)) throw new Error('Expected an array');
-      const existing = _loadSessions();
+      const merged = [..._loadSessions()];
+      let hitSessionCap = false;
       // Merge: imported entries overwrite existing ones with the same name
-      imported.forEach(entry => {
-        if (!entry.name || !entry.state) return;
-        const idx = existing.findIndex(s => s.name === entry.name);
-        if (idx >= 0) existing[idx] = entry;
-        else existing.push(entry);
-      });
-      _saveSessions(existing);
+      for (const entry of imported) {
+        const sanitized = _sanitizeSessionEntry(entry);
+        if (!sanitized) continue;
+        const idx = merged.findIndex(s => s.name === sanitized.name);
+        if (idx >= 0) merged[idx] = sanitized;
+        else {
+          if (merged.length >= MAX_SESSIONS) {
+            hitSessionCap = true;
+            break;
+          }
+          merged.push(sanitized);
+        }
+      }
+      _saveSessions(merged);
       renderSessionList();
-    } catch {
-      alert('Failed to import: invalid JSON file.');
+      if (hitSessionCap) alert(`Imported up to the saved-session limit (${MAX_SESSIONS}).`);
+    } catch (err) {
+      alert(`Failed to import: ${err.message || 'Invalid JSON file.'}`);
     }
     // Reset the file input so the same file can be re-imported
     input.value = '';
@@ -1313,6 +1460,7 @@ function importSessions(input) {
     state[type] = [...DEFAULTS[type]];
     renderTags(type);
   });
+  _syncFocusInfinityInput();
   _syncAngleInputs();
   drawAll();
   renderSessionList();
