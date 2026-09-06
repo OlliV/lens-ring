@@ -321,9 +321,10 @@
   </div>
   <div class="control-row">
     <label for="inp-focus-inf-gap" title="Adjust the gap between the last finite focus mark and infinity when an ∞ mark exists">
-      ∞ gap:
+      Infinity gap:
     </label>
     <input type="range" id="inp-focus-inf-gap" min="5" max="50" step="5" value="5"
+           aria-label="Gap before infinity mark (percent)"
            oninput="setFocusInfinityGap(this.value)" />
     <span id="lbl-focus-inf-gap" style="font-size:0.75rem;color:#666;">5% gap before ∞</span>
   </div>
@@ -946,6 +947,8 @@ function diopterScaleT(marks) {
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
   const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
+  // With only ∞-like values left, keep explicit ∞ marks at the far end while
+  // malformed non-positive fallback data stays centred instead of reserving a gap.
   if (finiteDiopters.length === 0) return marks.map(() => (hasExplicitInfinity ? 1 : 0.5));
 
   const maxFiniteT = hasExplicitInfinity ? clamp(1 - focusInfinityGap / 100, 0.5, 0.95) : 1;
