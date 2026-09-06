@@ -915,7 +915,7 @@ function diopterScaleT(marks) {
   if (marks.length === 1) return [0.5];
 
   // Focus input rejects non-positive values; if malformed data still appears,
-  // treat it like ∞ so rendering stays stable without affecting valid marks.
+  // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
   const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : 0));
   const lo = Math.min(...diopters);
