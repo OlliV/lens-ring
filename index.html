@@ -1339,7 +1339,13 @@ function saveSession() {
   const idx = sessions.findIndex(s => s.name === name);
   const entry = _sanitizeSessionEntry({ name, ..._captureState() });
   if (idx >= 0) sessions[idx] = entry;
-  else sessions.push(entry);
+  else {
+    if (sessions.length >= MAX_SESSIONS) {
+      alert(`Saved-session limit reached (${MAX_SESSIONS}). Delete one before saving a new name.`);
+      return;
+    }
+    sessions.push(entry);
+  }
   _saveSessions(sessions);
   inp.value = '';
   renderSessionList();
@@ -1404,10 +1410,10 @@ function exportSessions() {
   link.href      = url;
   document.body.appendChild(link);
   link.click();
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     link.remove();
     URL.revokeObjectURL(url);
-  }, 1000);
+  });
 }
 
 function importSessions(input) {
