@@ -914,9 +914,10 @@ function drawCircularRings(types, CW, CH) {
 function diopterScaleT(marks) {
   if (marks.length === 1) return [0.5];
 
-  // Focus input rejects non-positive values; this fallback only keeps any
-  // malformed persisted/default data from breaking rendering.
-  const diopters = marks.map(v => (isFinite(v) && v > 0 ? 1 / v : 0));
+  // Focus input rejects non-positive values; if malformed data still appears,
+  // treat it like ∞ so rendering stays stable without affecting valid marks.
+  const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
+  const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : 0));
   const lo = Math.min(...diopters);
   const hi = Math.max(...diopters);
 
