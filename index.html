@@ -938,32 +938,28 @@ function drawCircularRings(types, CW, CH) {
    Aperture and zoom keep the existing log-like spacing.
    ========================================================= */
 function diopterScaleT(marks) {
-  if (marks.length === 1) {
-    return [isFinite(marks[0]) && marks[0] > 0 ? 0.5 : 1];
-  }
-
   // Focus input rejects non-positive values; if malformed data still appears,
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
   const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
   if (finiteDiopters.length === 0) return marks.map(() => 1);
 
-  const hi = Math.max(...finiteDiopters);
-  const minFinite = Math.min(...finiteDiopters);
   const hasInfinity = sanitized.some(v => !isFinite(v));
-  if (finiteDiopters.length === 1 && hasInfinity) {
-    const finiteT = 1 - focusInfinityGap / 100;
-    return sanitized.map(v => (isFinite(v) ? finiteT : 1));
+  const maxFiniteT = hasInfinity ? 1 - focusInfinityGap / 100 : 1;
+  const hi = Math.max(...finiteDiopters);
+  const lo = Math.min(...finiteDiopters);
+
+  if (hi === lo) {
+    return sanitized.map(v => (!isFinite(v) ? 1 : hasInfinity ? maxFiniteT : 0.5));
   }
-  // Keep the proxy below the last finite diopter so ∞ never overlaps it.
-  const lo = hasInfinity
-    ? Math.max(minFinite * (1 - focusInfinityGap / 100), Number.EPSILON)
-    : minFinite;
-  const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : lo));
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
-  // The configured low-end proxy represents ∞ at the far end (t = 1).
-  return diopters.map(v => (hi === lo ? 0.5 : (hi - v) / (hi - lo)));
+  // When ∞ exists, reserve the configured gap at the far end (t = 1).
+  return sanitized.map(v => {
+    if (!isFinite(v)) return 1;
+    const diopter = 1 / v;
+    return ((hi - diopter) / (hi - lo)) * maxFiniteT;
+  });
 }
 
 function logScaleT(marks) {
