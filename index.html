@@ -795,7 +795,7 @@ function drawRing(type, y, h, marks) {
 
   /* Label */
   ctx.save();
-  ctx.font = `bold ${Math.min(labelFontSize + 4, 72)}px "Segoe UI", system-ui, sans-serif`;
+  ctx.font = `bold ${Math.min(labelFontSize + 4, 72)}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
   ctx.fillStyle = col.ring;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
@@ -815,7 +815,7 @@ function drawRing(type, y, h, marks) {
 
   if (marks.length === 0) {
     ctx.save();
-    ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `${labelFontSize}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
     ctx.fillStyle = '#555';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
@@ -853,7 +853,7 @@ function drawRing(type, y, h, marks) {
 
     /* Label */
     ctx.save();
-    ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `${labelFontSize}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
     ctx.fillStyle = col.text;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'center';
@@ -968,7 +968,7 @@ function drawCircularRings(types, CW, CH) {
         const ly = cy + sin * labelR;
 
         ctx.save();
-        ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
+        ctx.font = `${labelFontSize}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
         ctx.fillStyle = CANVAS_IS_LIGHT && ringIdx === 0 ? '#000' : col.text;
         ctx.textBaseline = 'middle';
         ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
@@ -978,7 +978,7 @@ function drawCircularRings(types, CW, CH) {
     } else {
       /* "(no marks)" hint — inside the band, just below the ring label */
       ctx.save();
-      ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
+      ctx.font = `${labelFontSize}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
       ctx.fillStyle = '#555';
       ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
@@ -988,7 +988,7 @@ function drawCircularRings(types, CW, CH) {
 
     /* Ring label inside the band at the gap position */
     ctx.save();
-    ctx.font = `bold ${Math.min(labelFontSize + 4, 72)}px "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `bold ${Math.min(labelFontSize + 4, 72)}px ui-monospace, "Roboto Mono", "Courier New", monospace`;
     ctx.fillStyle = col.ring;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
