@@ -200,6 +200,11 @@
 
     .control-row input[type=number]:focus { border-color: #4ea8ff; }
 
+    .control-row input[type=range] {
+      width: 180px;
+      accent-color: #4ea8ff;
+    }
+
     .layout-btn {
       background: #3a3a3a;
       border: 1px solid #555;
@@ -314,6 +319,14 @@
     <button class="layout-btn active" id="btn-fstop" onclick="setStopType('f')">f-stop</button>
     <button class="layout-btn"        id="btn-tstop" onclick="setStopType('t')">T-stop</button>
   </div>
+  <div class="control-row">
+    <label for="inp-focus-inf-pull" title="Pull the last finite focus mark closer to infinity when an ∞ mark exists">
+      ∞ spacing:
+    </label>
+    <input type="range" id="inp-focus-inf-pull" min="0" max="95" step="5" value="75"
+           oninput="setFocusInfinityPull(this.value)" />
+    <span id="lbl-focus-inf-pull" style="font-size:0.75rem;color:#666;">75% pull toward ∞</span>
+  </div>
 </div>
 
 <!-- Layout toggle -->
@@ -369,6 +382,7 @@ const state = {
 let layout       = 'linear'; // 'linear' | 'circular'
 let focusUnit    = 'metric'; // 'metric' | 'feet'
 let stopType     = 'f';      // 'f' | 't'
+let focusInfinityPull = 75;  // 0–95%: how tightly the last finite mark sits near ∞
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
@@ -621,6 +635,18 @@ function setStopType(type) {
     isTStop ? 'e.g. T1.8 or 2.8' : 'e.g. 1.8 or 2.8';
 
   renderTags('aperture');
+  drawAll();
+}
+
+function _syncFocusInfinityInput() {
+  document.getElementById('inp-focus-inf-pull').value = focusInfinityPull;
+  document.getElementById('lbl-focus-inf-pull').textContent = `${focusInfinityPull}% pull toward ∞`;
+}
+
+function setFocusInfinityPull(val) {
+  const n = clamp(parseInt(val, 10), 0, 95);
+  focusInfinityPull = isNaN(n) ? 75 : n;
+  _syncFocusInfinityInput();
   drawAll();
 }
 
@@ -917,12 +943,17 @@ function diopterScaleT(marks) {
   // Focus input rejects non-positive values; if malformed data still appears,
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
-  const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : 0));
-  const lo = Math.min(...diopters);
-  const hi = Math.max(...diopters);
+  const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
+  if (finiteDiopters.length === 0) return marks.map(() => 0.5);
+
+  const hi = Math.max(...finiteDiopters);
+  const minFinite = Math.min(...finiteDiopters);
+  const hasInfinity = sanitized.some(v => !isFinite(v));
+  const lo = hasInfinity ? minFinite * (focusInfinityPull / 100) : minFinite;
+  const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : lo));
 
   // Highest diopter = closest focus = start of the rail/arc (t = 0).
-  // Zero diopter = ∞ = far end of the rail/arc (t = 1).
+  // The configured low-end proxy represents ∞ at the far end (t = 1).
   return diopters.map(v => (hi === lo ? 0.5 : (hi - v) / (hi - lo)));
 }
 
@@ -1090,6 +1121,7 @@ function exportCanvas(format) {
     state[type] = [...DEFAULTS[type]];
     renderTags(type);
   });
+  _syncFocusInfinityInput();
   _syncAngleInputs();
   drawAll();
 })();
