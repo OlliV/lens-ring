@@ -944,11 +944,14 @@ function diopterScaleT(marks) {
   // treat it like ∞ so rendering stays stable and keeps using the far-end stop.
   const sanitized = marks.map(v => (isFinite(v) && v > 0 ? v : Infinity));
   const finiteDiopters = sanitized.filter(isFinite).map(v => 1 / v);
-  if (finiteDiopters.length === 0) return marks.map(() => 0.5);
+  if (finiteDiopters.length === 0) return marks.map(() => 1);
 
   const hi = Math.max(...finiteDiopters);
   const minFinite = Math.min(...finiteDiopters);
   const hasInfinity = sanitized.some(v => !isFinite(v));
+  if (finiteDiopters.length === 1 && hasInfinity) {
+    return sanitized.map(v => (isFinite(v) ? 0 : 1));
+  }
   // Keep the proxy below the last finite diopter so ∞ never overlaps it.
   const lo = hasInfinity ? minFinite * (1 - focusInfinityGap / 100) : minFinite;
   const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : lo));
