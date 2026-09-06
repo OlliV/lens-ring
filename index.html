@@ -921,6 +921,8 @@ function diopterScaleT(marks) {
   const lo = Math.min(...diopters);
   const hi = Math.max(...diopters);
 
+  // Highest diopter = closest focus = start of the rail/arc (t = 0).
+  // Zero diopter = ∞ = far end of the rail/arc (t = 1).
   return diopters.map(v => (hi === lo ? 0.5 : (hi - v) / (hi - lo)));
 }
 
