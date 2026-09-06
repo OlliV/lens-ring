@@ -914,9 +914,7 @@ function drawCircularRings(types, CW, CH) {
 function diopterScaleT(marks) {
   if (marks.length === 1) return [0.5];
 
-  const finitePositive = marks.filter(v => isFinite(v) && v > 0);
-  const minPositive = finitePositive.length ? Math.min(...finitePositive) : 1e-9;
-  const diopters = marks.map(v => (isFinite(v) ? 1 / Math.max(v, minPositive) : 0));
+  const diopters = marks.map(v => (isFinite(v) && v > 0 ? 1 / v : 0));
   const lo = Math.min(...diopters);
   const hi = Math.max(...diopters);
 
