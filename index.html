@@ -323,7 +323,7 @@
     <label for="inp-focus-inf-pull" title="Pull the last finite focus mark closer to infinity when an ∞ mark exists">
       ∞ spacing:
     </label>
-    <input type="range" id="inp-focus-inf-pull" min="0" max="95" step="5" value="75"
+    <input type="range" id="inp-focus-inf-pull" min="5" max="95" step="5" value="75"
            oninput="setFocusInfinityPull(this.value)" />
     <span id="lbl-focus-inf-pull" style="font-size:0.75rem;color:#666;">75% pull toward ∞</span>
   </div>
@@ -382,7 +382,7 @@ const state = {
 let layout       = 'linear'; // 'linear' | 'circular'
 let focusUnit    = 'metric'; // 'metric' | 'feet'
 let stopType     = 'f';      // 'f' | 't'
-let focusInfinityPull = 75;  // 0–95%: how tightly the last finite mark sits near ∞
+let focusInfinityPull = 75;  // 5–95%: 100% would overlap ∞ with the last finite mark
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
@@ -644,7 +644,7 @@ function _syncFocusInfinityInput() {
 }
 
 function setFocusInfinityPull(val) {
-  const n = clamp(parseInt(val, 10), 0, 95);
+  const n = clamp(parseInt(val, 10), 5, 95);
   focusInfinityPull = isNaN(n) ? 75 : n;
   _syncFocusInfinityInput();
   drawAll();
@@ -949,6 +949,7 @@ function diopterScaleT(marks) {
   const hi = Math.max(...finiteDiopters);
   const minFinite = Math.min(...finiteDiopters);
   const hasInfinity = sanitized.some(v => !isFinite(v));
+  // Keep the proxy below the last finite diopter so ∞ never overlaps it.
   const lo = hasInfinity ? minFinite * (focusInfinityPull / 100) : minFinite;
   const diopters = sanitized.map(v => (isFinite(v) ? 1 / v : lo));
 
