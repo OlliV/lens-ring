@@ -413,6 +413,11 @@
     <button class="layout-btn active" id="btn-cw"  onclick="setDirection('cw')">↻ Clockwise</button>
     <button class="layout-btn"        id="btn-ccw" onclick="setDirection('ccw')">↺ Counter-CW</button>
   </div>
+  <div class="control-row">
+    <label for="inp-label-font-size">Label font size (px):</label>
+    <input type="number" id="inp-label-font-size" value="14" min="6" max="72" step="1"
+           oninput="setLabelFontSize(this.value)" />
+  </div>
 </div>
 
 <!-- Canvas -->
@@ -462,6 +467,7 @@ let focusInfinityGap = 5;    // 5–50%: keep a visible finite range while reser
 let startAngleDeg = 135;     // degrees: where the first (min) mark is placed
 let sweepDeg      = 270;     // degrees: angular extent of the sweep (10–350)
 let ringDirection = 'cw';    // 'cw' | 'ccw'
+let labelFontSize = 14;      // px: font size for mark labels on the canvas
 
 /* =========================================================
    Defaults so the canvas is not empty on first load
@@ -743,6 +749,13 @@ function setFocusInfinityGap(val) {
   drawAll();
 }
 
+function setLabelFontSize(val) {
+  const parsed = parseInt(val, 10);
+  labelFontSize = isNaN(parsed) ? 14 : clamp(parsed, 6, 72);
+  document.getElementById('inp-label-font-size').value = labelFontSize;
+  drawAll();
+}
+
 function drawAll() {
   const CW = canvas.width;
   const CH = canvas.height;
@@ -782,7 +795,7 @@ function drawRing(type, y, h, marks) {
 
   /* Label */
   ctx.save();
-  ctx.font = 'bold 18px "Segoe UI", system-ui, sans-serif';
+  ctx.font = `bold ${Math.round(labelFontSize * 1.4)}px "Segoe UI", system-ui, sans-serif`;
   ctx.fillStyle = col.ring;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
@@ -802,7 +815,7 @@ function drawRing(type, y, h, marks) {
 
   if (marks.length === 0) {
     ctx.save();
-    ctx.font = '14px "Segoe UI", system-ui, sans-serif';
+    ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
     ctx.fillStyle = '#555';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
@@ -840,7 +853,7 @@ function drawRing(type, y, h, marks) {
 
     /* Label */
     ctx.save();
-    ctx.font = '13px "Segoe UI", system-ui, sans-serif';
+    ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
     ctx.fillStyle = col.text;
     ctx.textBaseline = 'bottom';
     ctx.textAlign = 'center';
@@ -955,7 +968,7 @@ function drawCircularRings(types, CW, CH) {
         const ly = cy + sin * labelR;
 
         ctx.save();
-        ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+        ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
         ctx.fillStyle = CANVAS_IS_LIGHT && ringIdx === 0 ? '#000' : col.text;
         ctx.textBaseline = 'middle';
         ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
@@ -965,7 +978,7 @@ function drawCircularRings(types, CW, CH) {
     } else {
       /* "(no marks)" hint — inside the band, just below the ring label */
       ctx.save();
-      ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+      ctx.font = `${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
       ctx.fillStyle = '#555';
       ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
@@ -975,7 +988,7 @@ function drawCircularRings(types, CW, CH) {
 
     /* Ring label inside the band at the gap position */
     ctx.save();
-    ctx.font = `bold 12px "Segoe UI", system-ui, sans-serif`;
+    ctx.font = `bold ${labelFontSize}px "Segoe UI", system-ui, sans-serif`;
     ctx.fillStyle = col.ring;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'center';
@@ -1283,6 +1296,9 @@ function _sanitizeSessionEntry(entry) {
   const parsedSweep = parseInt(entry.sweepDeg, 10);
   if (!isNaN(parsedSweep)) sanitized.sweepDeg = clamp(parsedSweep, 10, 350);
 
+  const parsedFontSize = parseInt(entry.labelFontSize, 10);
+  if (!isNaN(parsedFontSize)) sanitized.labelFontSize = clamp(parsedFontSize, 6, 72);
+
   return sanitized;
 }
 
@@ -1300,6 +1316,7 @@ function _captureState() {
     startAngleDeg,
     sweepDeg,
     ringDirection,
+    labelFontSize,
     activeRings: {
       focus:    document.getElementById('chk-focus').checked,
       aperture: document.getElementById('chk-aperture').checked,
@@ -1334,6 +1351,7 @@ function _applyState(s) {
   sweepDeg      = session.sweepDeg      ?? sweepDeg;
   if (session.ringDirection) setDirection(session.ringDirection);
   _syncAngleInputs();
+  if (session.labelFontSize != null) setLabelFontSize(session.labelFontSize);
   // Re-render tags
   ['focus', 'aperture', 'zoom'].forEach(t => renderTags(t));
   drawAll();
