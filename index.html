@@ -480,6 +480,7 @@ const COLORS = {
   aperture: { ring: '#ff9f4e', text: '#ffd8b0', bg: '#3a2000' },
   zoom:     { ring: '#6adf7e', text: '#c0f5c8', bg: '#0a2d12' },
 };
+const CANVAS_BG = '#fff';
 
 /* =========================================================
    Helpers
@@ -734,7 +735,7 @@ function drawAll() {
   const CW = canvas.width;
   const CH = canvas.height;
   ctx.clearRect(0, 0, CW, CH);
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = CANVAS_BG;
   ctx.fillRect(0, 0, CW, CH);
 
   const types = getActiveTypes();
@@ -943,7 +944,7 @@ function drawCircularRings(types, CW, CH) {
 
         ctx.save();
         ctx.font = '11px "Segoe UI", system-ui, sans-serif';
-        ctx.fillStyle = '#000';
+        ctx.fillStyle = CANVAS_BG === '#fff' ? '#000' : col.text;
         ctx.textBaseline = 'middle';
         ctx.textAlign = cos > 0.1 ? 'left' : cos < -0.1 ? 'right' : 'center';
         ctx.fillText(FORMATTERS[type](val), lx, ly);
